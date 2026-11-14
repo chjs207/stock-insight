@@ -274,7 +274,7 @@ tbody tr { border-top: 1px solid var(--line); }
 .main-nav a:hover, .main-nav a[aria-current="page"] { color: var(--deep); }
 .main-nav a[aria-current="page"] { border-color: var(--green); }
 .research-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding: 18px; }
-.research-toolbar h1 { font-size: 21px; letter-spacing: -.04em; }
+.research-toolbar :is(h1,h2) { font-size: 21px; letter-spacing: -.04em; }
 .research-toolbar p { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .research-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .research-results { margin-top: 12px; padding: 18px; }

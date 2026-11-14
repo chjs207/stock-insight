@@ -637,6 +637,7 @@ function CompanyFinancials({ company }: { company: Company }) {
 const companyViews = [
   { key: "financials", label: "기업 재무", icon: "table", content: CompanyFinancials },
   { key: "chart", label: "주가 차트", icon: "chart", content: CompanyPriceChart },
+  { key: "research", label: "기업 리서치", icon: "research", content: CompanyResearch },
 ] as const;
 
 function CompanyDetail({ corpCode, view }: { corpCode: string; view?: string }) {

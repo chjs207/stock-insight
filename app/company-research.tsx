@@ -9,10 +9,10 @@ const numbers = new Intl.NumberFormat("ko-KR");
 const updated = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 type Selection = { query: string; company: Company | null; page: number; refresh: boolean; version: number };
 
-export default function CompanyResearch() {
+export default function CompanyResearch({ company }: { company?: Company }) {
   const [searchText, setSearchText] = useState("");
   const [mode, setMode] = useState<ResearchSearchMode>("company");
-  const [selection, setSelection] = useState<Selection>({ query: "", company: null, page: 0, refresh: false, version: 0 });
+  const [selection, setSelection] = useState<Selection>({ query: "", company: company ?? null, page: 0, refresh: false, version: 0 });
   const [choices, setChoices] = useState<Company[]>([]);
   const [companySearching, setCompanySearching] = useState(false);
   const [companyError, setCompanyError] = useState("");
@@ -20,13 +20,14 @@ export default function CompanyResearch() {
   const [listing, setListing] = useState<ResearchListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const currentCompany = company ?? selection.company;
   useEffect(() => () => companyRequest.current?.abort(), []);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError("");
-    const params = new URLSearchParams({ page: String(selection.page), mode: selection.company ? "company" : "keyword" });
-    if (selection.company) params.set("stock", selection.company.stockCode);
+    const params = new URLSearchParams({ page: String(selection.page), mode: currentCompany ? "company" : "keyword" });
+    if (currentCompany) params.set("stock", currentCompany.stockCode);
     else if (selection.query) params.set("q", selection.query);
     if (selection.refresh) params.set("refresh", "1");
     requestJson<ResearchListing>("/api/research?" + params, { signal: controller.signal }).then(
@@ -34,7 +35,7 @@ export default function CompanyResearch() {
       failure => { if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "리서치 목록을 읽지 못했습니다."); },
     ).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [selection]);
+  }, [selection, currentCompany?.stockCode]);
 
   function clearCompanySearch() {
     companyRequest.current?.abort(); companyRequest.current = null;
@@ -81,13 +82,14 @@ export default function CompanyResearch() {
     window.scrollTo(0, 0);
   }
   const data = listing?.page === selection.page && listing.query === selection.query &&
-    listing.stockCode === (selection.company?.stockCode ?? null) ? listing : null;
+    listing.stockCode === (currentCompany?.stockCode ?? null) ? listing : null;
   const busy = loading || companySearching;
   return <>
     <section className="panel research-toolbar" aria-labelledby="research-title">
       <div>
-        <h1 id="research-title">기업 리서치</h1>
-        <p>네이버 증권의 기업 보고서 목록입니다. 제목을 누르면 상세 내용을 새 탭에서 볼 수 있습니다.</p>
+        {company ? <h2 id="research-title">{company.name} 기업 리서치</h2> : <h1 id="research-title">기업 리서치</h1>}
+        <p>{company ? company.name + " (" + company.stockCode + ") 보고서만 표시합니다. 제목을 누르면 상세 내용을 새 탭에서 볼 수 있습니다."
+          : "네이버 증권의 기업 보고서 목록입니다. 제목을 누르면 상세 내용을 새 탭에서 볼 수 있습니다."}</p>
       </div>
       <div className="research-actions">
         <button type="button" className="expand-button" disabled={busy} onClick={refresh}>최신 목록 조회</button>
@@ -95,6 +97,7 @@ export default function CompanyResearch() {
       </div>
     </section>
     <section className="panel research-results" aria-label="기업 보고서 목록" aria-busy={busy}>
+      {!company && <>
       <form className="research-search" onSubmit={search}>
         <fieldset className="research-search-mode"><legend>검색 방식</legend>
           {([{ value: "company", label: "기업명" }, { value: "keyword", label: "키워드" }] as const).map(item =>
@@ -119,19 +122,21 @@ export default function CompanyResearch() {
         <ul>{choices.map(company => <li key={company.corpCode}><button type="button" className="research-company-choice"
           onClick={() => selectCompany(company)}><strong>{company.name}</strong><span>{company.market} · {company.stockCode}</span></button></li>)}</ul>
       </div>}
+      </>}
       {loading && <p className="loading research-loading" role="status"><span className="spinner"/> 보고서 목록을 불러오는 중…</p>}
       {error && <p className="notice error" role="alert">{error}
         <button type="button" className="expand-button" onClick={refresh} disabled={loading}>다시 조회</button>
       </p>}
       {data && <>
         <div className="research-list-meta" role="status">
-          <span>{selection.company ? selection.company.name + " (" + selection.company.stockCode + ") 보고서 "
+          <span>{currentCompany ? currentCompany.name + " (" + currentCompany.stockCode + ") 보고서 "
             : selection.query ? "키워드 ‘" + selection.query + "’ 검색 결과 " : "전체 "}<strong>{numbers.format(data.total)}건</strong>
             {data.reports.length > 0 && " · " + numbers.format(selection.page * researchPageSize + 1) + "–" + numbers.format(selection.page * researchPageSize + data.reports.length) + "번째"}</span>
           <small>출처 네이버 증권 · {updated.format(new Date(data.fetchedAt))} 기준</small>
         </div>
         {data.warning && <p className="notice" role="status">{data.warning} 저장된 목록을 표시합니다.</p>}
-        {data.reports.length === 0 ? <p className="research-empty">{selection.company ? "이 기업에 대한 보고서가 없습니다. 다른 기업을 검색하거나 전체 목록을 확인해 주세요."
+        {data.reports.length === 0 ? <p className="research-empty">{company ? "아직 이 기업에 대한 보고서가 없습니다."
+          : currentCompany ? "이 기업에 대한 보고서가 없습니다. 다른 기업을 검색하거나 전체 목록을 확인해 주세요."
           : "검색 결과가 없습니다. 다른 키워드로 검색해 주세요."}</p>
           : <ul className="research-list">{data.reports.map(report => <li key={report.id}>
             <article className="research-row">
