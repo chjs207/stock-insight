@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import type { FormEvent } from "react";
 import { requestJson } from "../lib/client-api";
+import ManagerRegistration from "./manager-registration";
 import { vipManager } from "../lib/ownership";
 import type { AssetManager, HoldingReport, OwnershipCoverage, OwnershipView } from "../lib/ownership";
 
@@ -100,8 +100,6 @@ export default function GiantsPage() {
   const [dataError, setDataError] = useState("");
   const [actionError, setActionError] = useState("");
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -133,27 +131,16 @@ export default function GiantsPage() {
     return () => controller.abort();
   }, [manager, revision]);
 
-  async function addManager(event: FormEvent) {
-    event.preventDefault();
-    if (!name.trim()) return;
-    setSaving(true);
-    setActionError("");
-    try {
-      const saved = await giantsRequest<AssetManager>({ name: name.trim() }, { method: "PUT" });
-      setOverview((current) => current && !current.managers.some((item) => item.key === saved.key)
-        ? { ...current, managers: [...current.managers, saved] } : current);
-      setManager(saved.key);
-      setName("");
-      setAdding(false);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "운용사를 추가하지 못했습니다.");
-    } finally {
-      setSaving(false);
-    }
+  function selectManager(saved: AssetManager) {
+    setOverview((current) => current && !current.managers.some((item) => item.key === saved.key)
+      ? { ...current, managers: [...current.managers, saved] } : current);
+    setManager(saved.key);
+    setAdding(false);
   }
 
   async function sync() {
     if (!overview) return;
+    setAdding(false);
     const months = [...new Set([overview.coverage.currentMonth, ...overview.coverage.missing])];
     setActionError("");
     setSyncing({ done: 0, total: months.length });
@@ -192,17 +179,11 @@ export default function GiantsPage() {
           </select>
         </label>
         <button type="button" className="expand-button" aria-expanded={adding}
-          disabled={!overview} onClick={() => setAdding((value) => !value)}>＋ 운용사 추가</button>
+          disabled={!overview || Boolean(syncing)} onClick={() => setAdding(true)}>＋ 운용사 추가</button>
         <button type="button" className="expand-button" disabled={!overview || Boolean(syncing)}
           onClick={() => void sync()}>{syncing ? "갱신 중…" : "공시 목록 갱신"}</button>
       </div>
-      {adding && <form className="manager-form" onSubmit={addManager}>
-        <label className="manager-field">DART 공시 제출인명
-          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={80}
-            placeholder="예시 신영자산운용" required/>
-        </label>
-        <button type="submit" className="watch-button" disabled={saving}>{saving ? "추가 중…" : "추가"}</button>
-      </form>}
+      {adding && <ManagerRegistration onComplete={selectManager} onCancel={() => setAdding(false)} onRefresh={() => void sync()}/>}
       {coverage && <p className="giants-period">조회 기간 {dateLabel(coverage.start)}–{dateLabel(coverage.end)}
         {coverage.through ? " · 목록 수집 기준 " + dateLabel(coverage.through) : ""}
         {coverage.missing.length ? " · 미수집 " + coverage.missing.length + "개월" : ""}

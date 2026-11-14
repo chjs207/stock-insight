@@ -52,6 +52,7 @@ export function createApi(db: D1Database, dartKey: string, transport: DartTransp
       if (url.pathname === "/api/giants") {
         const service = giantsService(db, dartKey, transport);
         const manager = params.get("manager");
+        if (method === "GET" && params.get("preview") === "1") return json(await service.previewManager(params.get("name") ?? ""));
         if (method === "PUT") return json(await service.addManager(params.get("name") ?? ""));
         if (method === "POST" && !manager) { await service.syncMonth(params.get("month") ?? ""); return json({ synced: true }); }
         if (manager) {

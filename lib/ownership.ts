@@ -32,3 +32,9 @@ export type OwnershipCoverage = {
   currentMonth: string;
   through: string | null;
 };
+
+export type ManagerPreview = OwnershipView & {
+  manager: AssetManager;
+  registered: boolean;
+  coverage: OwnershipCoverage;
+};

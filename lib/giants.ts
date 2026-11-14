@@ -1,7 +1,7 @@
 import { dartClient, MarketError } from "./dart.ts";
 import type { DartTransport } from "./dart.ts";
 import { vipManager } from "./ownership.ts";
-import type { AssetManager, Disclosure, HoldingReport, Ownership, OwnershipCoverage, OwnershipView } from "./ownership.ts";
+import type { AssetManager, Disclosure, HoldingReport, ManagerPreview, Ownership, OwnershipCoverage, OwnershipView } from "./ownership.ts";
 
 type FilingRow = {
   corp_cls: string; corp_code: string; stock_code: string; corp_name: string;
@@ -90,18 +90,17 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
   }
 
   async function addManager(input: string): Promise<AssetManager> {
-    const name = input.trim().replace(/\s+/g, " ");
-    const key = managerKey(name);
-    if (!key || name.length > 80 || !/[가-힣a-z0-9]/i.test(key)) {
-      throw new MarketError("운용사명을 80자 이내로 입력해 주세요.", 400);
+    const result = await previewManager(input);
+    if (!result.reports.length) {
+      if (result.coverage.missing.length) {
+        throw new MarketError("공시 목록이 일부만 수집되어 조회 내역을 확인하지 못했습니다. 공시 목록을 갱신한 뒤 다시 조회해 주세요.", 409);
+      }
+      throw new MarketError("최근 3년 내 조회된 지분공시가 없어 등록할 수 없습니다. DART 공시 제출인명을 확인해 주세요.", 400);
     }
+    const { key, name } = result.manager;
     if (key === vipManager.key) return vipManager;
-    const display = await db.prepare(
-      "SELECT json_extract(j.value, '$.filer') AS name FROM ownership_months m, json_each(m.data) j " +
-      "WHERE m.month BETWEEN ? AND ? AND json_extract(j.value, '$.filerKey') = ? LIMIT 1",
-    ).bind(start.slice(0, 6), currentMonth, key).first<string>("name");
     await db.prepare("INSERT OR IGNORE INTO asset_managers (key, name, added_at) VALUES (?, ?, ?)")
-      .bind(key, display || name, now.getTime()).run();
+      .bind(key, name, now.getTime()).run();
     const saved = await db.prepare("SELECT key, name FROM asset_managers WHERE key = ?").bind(key).first<AssetManager>();
     if (!saved) throw new MarketError("운용사를 저장하지 못했습니다.");
     return saved;
@@ -151,11 +150,7 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
     ).bind(month, window.to, now.getTime(), JSON.stringify(Array.from(reports.values()))).run();
   }
 
-  async function snapshot(key: string): Promise<OwnershipView> {
-    if (key !== vipManager.key) {
-      const exists = await db.prepare("SELECT 1 FROM asset_managers WHERE key = ?").bind(key).first();
-      if (!exists) throw new MarketError("추가한 운용사를 선택해 주세요.", 404);
-    }
+  async function readReports(key: string): Promise<OwnershipView> {
     const rows = await db.prepare(
       "SELECT j.value AS filing, json_extract(d.data, '$.' || json_extract(j.value, '$.receipt')) AS ownership " +
       "FROM ownership_months m, json_each(m.data) j LEFT JOIN ownership_details d ON d.corp_code = json_extract(j.value, '$.corpCode') " +
@@ -167,6 +162,30 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
       ownership: ownership === null ? null : JSON.parse(ownership) as Ownership,
     }));
     return { reports, pending: reports.filter((report) => report.ownership === null).length };
+  }
+
+  async function previewManager(input: string): Promise<ManagerPreview> {
+    const name = input.trim().replace(/\s+/g, " ");
+    const key = managerKey(name);
+    if (!key || name.length > 80 || !/[가-힣a-z0-9]/i.test(key)) {
+      throw new MarketError("운용사명을 80자 이내로 입력해 주세요.", 400);
+    }
+    const [view, range, saved] = await Promise.all([
+      readReports(key), coverage(),
+      db.prepare("SELECT 1 FROM asset_managers WHERE key = ?").bind(key).first(),
+    ]);
+    // Preview reads collected filings only and never registers a manager.
+    // Use the filer name from an actual in-range report, not an unchecked input.
+    return { ...view, manager: { key, name: view.reports[0]?.filer ?? name },
+      registered: key === vipManager.key || Boolean(saved), coverage: range };
+  }
+
+  async function snapshot(key: string): Promise<OwnershipView> {
+    if (key !== vipManager.key) {
+      const exists = await db.prepare("SELECT 1 FROM asset_managers WHERE key = ?").bind(key).first();
+      if (!exists) throw new MarketError("추가한 운용사를 선택해 주세요.", 404);
+    }
+    return readReports(key);
   }
 
   async function syncDetails(key: string, limit = 5) {
@@ -184,5 +203,5 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
     return missing.length;
   }
 
-  return { coverage, managers, addManager, syncMonth, snapshot, syncDetails };
+  return { coverage, managers, previewManager, addManager, syncMonth, snapshot, syncDetails };
 }

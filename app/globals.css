@@ -274,6 +274,21 @@ tbody tr { border-top: 1px solid var(--line); }
 .manager-field :is(select,input) { min-height: 38px; padding: 5px 8px; border: 1px solid #cfe0d7; border-radius: 8px; background: white; color: var(--ink); font: inherit; font-size: 14px; }
 .manager-field select { max-width: min(100%, 400px); }
 .manager-form { margin-top: 13px; }
+.manager-registration { margin-top: 15px; padding: 16px; border: 1px solid #d9e5de; border-radius: 10px; background: #f8fbf9; }
+.manager-registration h3 { margin: 0 0 7px; font-size: 15px; }
+.manager-registration > p, .manager-preview-empty { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.manager-preview { margin-top: 18px; }
+.manager-preview-summary, .manager-preview-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.manager-preview-summary strong { font-size: 15px; }
+.manager-preview-summary span, .manager-preview-actions > span { color: var(--muted); font-size: 12px; }
+.manager-preview-scroll { max-height: 380px; margin-top: 12px; border: 1px solid #e0e8e3; border-radius: 8px; background: white; }
+.manager-preview-table { min-width: 530px; }
+.manager-preview-table small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; }
+.manager-preview-table tbody td:last-child { white-space: normal; min-width: 220px; }
+.manager-preview-more { margin-top: 10px; }
+.manager-preview-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid #dce7df; }
+.manager-preview-empty { margin-top: 14px; padding: 14px; border-radius: 8px; background: white; }
+.manager-coverage-note { justify-content: space-between; flex-wrap: wrap; }
 .giants-period, .holdings-note { color: var(--muted); font-size: 12px; line-height: 1.55; }
 .giants-period { margin-top: 11px; }
 .holdings-panel, .giants-empty { margin-top: 13px; }
