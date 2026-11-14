@@ -90,7 +90,7 @@ export async function pagesRequest<T>(path: string, options: RequestInit = {}): 
       const company = catalog.companies.find(company => company.corpCode === corp);
       if (!company) throw new Error("KOSPI·KOSDAQ 기업 목록에서 찾지 못했습니다.");
       if (params.get("profile") === "1") return (catalog.collected[corp] ? (await getCompanyData(corp)).company : company) as T;
-      if (!catalog.collected[corp]) throw new Error("아직 수집되지 않은 기업입니다. 아래 자료 수집 안내에서 종목을 추가해 주세요.");
+      if (!catalog.collected[corp]) throw new Error("아직 수집되지 않은 기업입니다. 자료 수집 안내에서 종목을 추가해 주세요.");
       const data = await getCompanyData(corp);
       if (params.get("valuation") === "1") {
         if (!data.quote) throw new Error("수집된 시가총액이 없습니다. 다음 수집 후 PER·POR를 계산할 수 있습니다.");
