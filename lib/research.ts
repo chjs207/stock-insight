@@ -6,7 +6,7 @@ import type { ResearchListing, ResearchPage, ResearchReport } from "./research-d
 const inflight = new WeakMap<D1Database, Map<string, Promise<ResearchListing>>>();
 const invalidResponse = () => new MarketError("네이버 리서치 목록의 형식을 확인하지 못했습니다. 네이버 원본을 확인하거나 나중에 다시 조회해 주세요.");
 
-function readPage(data: unknown, page: number, query: string): ResearchPage {
+function readPage(data: unknown, page: number, query: string, stockCode?: string): ResearchPage {
   if (!data || typeof data !== "object") throw invalidResponse();
   const raw = data as Record<string, unknown>;
   const total = Number(raw.totalCount);
@@ -31,11 +31,13 @@ function readPage(data: unknown, page: number, query: string): ResearchPage {
     };
   });
   if (new Set(reports.map(report => report.id)).size !== reports.length) throw invalidResponse();
-  return { reports, total, hasNext: raw.hasNext, page, query };
+  if (stockCode && reports.some(report => report.stockCode !== stockCode)) throw invalidResponse();
+  return { reports, total, hasNext: raw.hasNext, page, query,
+    mode: stockCode ? "company" : query ? "keyword" : "all", stockCode: stockCode ?? null };
 }
 
 export function researchService(db: D1Database, transport: DartTransport) {
-  async function load(page: number, query: string, refresh: boolean, cacheKey: string): Promise<ResearchListing> {
+  async function load(page: number, query: string, refresh: boolean, cacheKey: string, stockCode?: string): Promise<ResearchListing> {
     const cached = await db.prepare("SELECT data, fetched_at FROM research_pages WHERE cache_key = ?")
       .bind(cacheKey).first<{ data: string; fetched_at: number }>();
     const saved = cached ? { ...JSON.parse(cached.data) as ResearchPage, fetchedAt: cached.fetched_at } : null;
@@ -43,9 +45,10 @@ export function researchService(db: D1Database, transport: DartTransport) {
       return { ...saved, source: "DB", stale: false };
     }
     try {
-      const response = await transport("research/company", { index: String(page), size: String(researchPageSize), ...(query ? { query } : {}) });
+      const response = await transport("research/company", { index: String(page), size: String(researchPageSize),
+        ...(stockCode ? { itemCodes: stockCode } : query ? { query } : {}) });
       if (!response.ok) throw new MarketError("네이버 리서치 목록을 조회하지 못했습니다. 잠시 후 다시 조회해 주세요.");
-      const result = readPage(await response.json(), page, query);
+      const result = readPage(await response.json(), page, query, stockCode);
       const fetchedAt = Date.now();
       await db.prepare("INSERT INTO research_pages (cache_key, fetched_at, data) VALUES (?, ?, ?) " +
         "ON CONFLICT(cache_key) DO UPDATE SET fetched_at=excluded.fetched_at, data=excluded.data WHERE excluded.fetched_at >= research_pages.fetched_at")
@@ -59,17 +62,21 @@ export function researchService(db: D1Database, transport: DartTransport) {
   }
 
   return {
-    list(page = 0, input = "", refresh = false): Promise<ResearchListing> {
+    list(page = 0, input = "", refresh = false, stockCode?: string): Promise<ResearchListing> {
       const query = input.trim();
       if (!Number.isInteger(page) || page < 0 || page > 10_000 || query.length > 60) {
         throw new MarketError("검색어는 60자 이내, 페이지는 올바른 범위로 입력해 주세요.", 400);
       }
-      const cacheKey = JSON.stringify([query, page]);
+      if (stockCode !== undefined && (!/^\d{6}$/.test(stockCode) || query)) {
+        throw new MarketError("기업명 검색은 선택한 기업의 6자리 종목코드로 조회해 주세요.", 400);
+      }
+      // The company filter is part of the key; older keyword-only cache entries cannot match.
+      const cacheKey = JSON.stringify([stockCode ?? null, query, page]);
       let requests = inflight.get(db);
       if (!requests) { requests = new Map(); inflight.set(db, requests); }
       const pending = requests.get(cacheKey);
       if (pending) return pending;
-      const result = load(page, query, refresh, cacheKey).finally(() => requests!.delete(cacheKey));
+      const result = load(page, query, refresh, cacheKey, stockCode).finally(() => requests!.delete(cacheKey));
       requests.set(cacheKey, result);
       return result;
     },

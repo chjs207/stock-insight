@@ -46,6 +46,83 @@ test("searches the upstream corpus and caches each search and page independently
   } finally { database.close(); }
 });
 
+test("company search sends a stock code filter and keeps it on later pages", async () => {
+  const database = openDatabase(":memory:");
+  try {
+    const network = vi.fn(async () => Response.json(page()));
+    const api = createApi(database.db, "private-dart-test", network);
+    for (const index of [0, 1]) {
+      const response = await api(new URL("http://localhost/api/research?" + new URLSearchParams({ mode: "company", stock: "005930", page: String(index) })), "GET");
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ mode: "company", stockCode: "005930", query: "", page: index, total: 41,
+        reports: [expect.objectContaining({ stockCode: "005930" })] });
+      expect(network).toHaveBeenLastCalledWith("research/company", { index: String(index), size: "20", itemCodes: "005930" });
+    }
+    expect(network).toHaveBeenCalledTimes(2);
+  } finally { database.close(); }
+});
+
+test("company and keyword searches have separate caches and preserve their different meaning", async () => {
+  const database = openDatabase(":memory:");
+  try {
+    const other = { ...item, nid: "12346", itemName: "관련기업", itemCode: "000660" };
+    const network = vi.fn(async () => Response.json(page([other])));
+    const service = researchService(database.db, network);
+    const keyword = await service.list(0, "삼성전자");
+    expect(keyword).toMatchObject({ mode: "keyword", stockCode: null, reports: [expect.objectContaining({ company: "관련기업" })] });
+    network.mockResolvedValueOnce(Response.json(page()));
+    const company = await service.list(0, "", false, "005930");
+    expect(company).toMatchObject({ mode: "company", reports: [expect.objectContaining({ stockCode: "005930" })] });
+    expect(await service.list(0, "삼성전자")).toMatchObject({ source: "DB", reports: keyword.reports });
+    expect(await service.list(0, "", false, "005930")).toMatchObject({ source: "DB", reports: company.reports });
+    expect(network).toHaveBeenCalledTimes(2);
+  } finally { database.close(); }
+});
+
+test("an ignored company filter never exposes other companies or reuses keyword results", async () => {
+  const database = openDatabase(":memory:");
+  try {
+    const wrongPage = page([{ ...item, itemCode: "000660", itemName: "다른기업" }]);
+    const network = vi.fn(async () => Response.json(wrongPage));
+    const service = researchService(database.db, network);
+    await service.list(0, "삼성전자");
+    await expect(service.list(0, "", false, "005930")).rejects.toMatchObject({ httpStatus: 502 });
+    network.mockResolvedValueOnce(Response.json(page()));
+    const correct = await service.list(0, "", false, "005930");
+    database.sql.prepare("UPDATE research_pages SET fetched_at = ?").run(Date.now() - 11 * 60_000);
+    const fallback = await service.list(0, "", false, "005930");
+    expect(fallback).toMatchObject({ stale: true, mode: "company", reports: correct.reports });
+    expect(fallback.reports.every(report => report.stockCode === "005930")).toBe(true);
+  } finally { database.close(); }
+});
+
+test("legacy keyword-only cache entries cannot satisfy a company query", async () => {
+  const database = openDatabase(":memory:");
+  try {
+    database.sql.prepare("INSERT INTO research_pages VALUES (?, ?, ?)")
+      .run(JSON.stringify(["삼성전자", 0]), Date.now(), JSON.stringify({ reports: [{ stockCode: "000660" }], total: 1, page: 0, query: "삼성전자", hasNext: false }));
+    const network = vi.fn(async () => Response.json(page()));
+    expect(await researchService(database.db, network).list(0, "", false, "005930")).toMatchObject({ source: "NAVER", stockCode: "005930" });
+    expect(network).toHaveBeenCalledTimes(1);
+  } finally { database.close(); }
+});
+
+test("ambiguous search modes and invalid company filters are rejected before upstream access", async () => {
+  const database = openDatabase(":memory:");
+  try {
+    const network = vi.fn(async () => Response.json(page()));
+    const api = createApi(database.db, "private-dart-test", network);
+    for (const params of [
+      { mode: "company" }, { mode: "company", stock: "00593" }, { mode: "company", stock: "005930,000660" },
+      { mode: "company", stock: "005930", q: "삼성전자" }, { mode: "keyword", stock: "005930" }, { mode: "invalid" },
+    ]) {
+      const query = new URLSearchParams(Object.entries(params));
+      expect((await api(new URL("http://localhost/api/research?" + query), "GET")).status).toBe(400);
+    }
+    expect(network).not.toHaveBeenCalled();
+  } finally { database.close(); }
+});
+
 test("an expired or forced refresh failure keeps the stored list and returns a warning", async () => {
   const database = openDatabase(":memory:");
   try {
@@ -118,7 +195,7 @@ test("concurrent reads of the same page share one upstream request", async () =>
 });
 
 test("research transport uses only the Naver host and never sends DART or Kiwoom credentials", async () => {
-  const network = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(page()));
+  const network = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(page()));
   const transport = serverTransport({ dartKey: "dart-private-test", appKey: "kiwoom-private-test", appSecret: "secret-private-test",
     host: "127.0.0.1", port: 4180, databasePath: ":memory:" });
   const response = await transport("research/company", { index: "0", size: "20", query: "삼성 & 반도체" });
@@ -129,8 +206,12 @@ test("research transport uses only the Naver host and never sends DART or Kiwoom
   expect(url.pathname).toBe("/api/stockSecurity/researches/v2/company");
   expect(Object.fromEntries(url.searchParams)).toEqual({ index: "0", size: "20", query: "삼성 & 반도체" });
   expect(JSON.stringify([String(input), options])).not.toContain("private-test");
+  await transport("research/company", { index: "1", size: "20", itemCodes: "005930" });
+  const companyUrl = new URL(String(network.mock.calls[1][0]));
+  expect(Object.fromEntries(companyUrl.searchParams)).toEqual({ index: "1", size: "20", itemCodes: "005930" });
+  expect(JSON.stringify(network.mock.calls[1])).not.toContain("private-test");
   await expect(transport("research/https://untrusted.example", {})).rejects.toMatchObject({ httpStatus: 400 });
-  expect(network).toHaveBeenCalledTimes(1);
+  expect(network).toHaveBeenCalledTimes(2);
 });
 
 test("a saved research page survives reopening the local database without a network call", async () => {

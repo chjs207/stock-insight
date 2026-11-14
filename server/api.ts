@@ -16,7 +16,12 @@ export function createApi(db: D1Database, dartKey: string, transport: DartTransp
       if (url.pathname === "/api/research" && method === "GET") {
         const page = params.get("page") ?? "0";
         if (!/^(0|[1-9]\d{0,4})$/.test(page)) throw new MarketError("올바른 페이지를 선택해 주세요.", 400);
-        return json(await researchService(db, transport).list(Number(page), params.get("q") ?? "", params.get("refresh") === "1"));
+        const mode = params.get("mode") ?? "keyword";
+        if (!["company", "keyword"].includes(mode) || (mode === "keyword" && params.has("stock"))) {
+          throw new MarketError("기업명 또는 키워드 검색 방식을 선택해 주세요.", 400);
+        }
+        return json(await researchService(db, transport).list(Number(page), params.get("q") ?? "", params.get("refresh") === "1",
+          mode === "company" ? params.get("stock") ?? "" : undefined));
       }
       if (url.pathname === "/api/market" && method === "GET") {
         if (params.get("status") === "1") return json({ configured: Boolean(dartKey) });

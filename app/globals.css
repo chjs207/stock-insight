@@ -275,7 +275,19 @@ tbody tr { border-top: 1px solid var(--line); }
 .research-search { display: grid; gap: 7px; }
 .research-search label { color: var(--muted); font-size: 12px; font-weight: 700; }
 .research-search-input { display: flex; flex-wrap: wrap; gap: 8px; }
-.research-search input { flex: 1; min-width: 140px; max-width: 440px; min-height: 38px; padding: 7px 10px; border: 1px solid #cfe0d7; border-radius: 8px; background: white; color: var(--ink); font: inherit; font-size: 14px; }
+.research-search input[type="search"] { flex: 1; min-width: 140px; max-width: 440px; min-height: 38px; padding: 7px 10px; border: 1px solid #cfe0d7; border-radius: 8px; background: white; color: var(--ink); font: inherit; font-size: 14px; }
+.research-search-mode { display: flex; flex-wrap: wrap; gap: 15px; padding: 0 0 6px; margin: 0; border: 0; }
+.research-search-mode legend { margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.research-search-mode label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.research-search-mode input { margin: 0; accent-color: var(--green); }
+.research-search-help { color: var(--muted); font-size: 11px; line-height: 1.7; }
+.research-company-choices { margin-top: 13px; padding: 13px; border: 1px solid #d5e5dc; border-radius: 9px; background: #f8fbf9; }
+.research-company-choices > p { margin-bottom: 9px; color: var(--muted); font-size: 12px; }
+.research-company-choices ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 7px; padding: 0; margin: 0; list-style: none; }
+.research-company-choice { display: grid; width: 100%; gap: 5px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); text-align: left; }
+.research-company-choice:hover { border-color: #8dc4ad; background: #f0f8f3; }
+.research-company-choice strong { font-size: 13px; }
+.research-company-choice span { color: var(--muted); font-size: 11px; }
 .research-loading { margin-block: 16px; }
 .research-list-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 19px; padding-bottom: 13px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.7; }
 .research-list-meta strong { color: var(--deep); }
@@ -309,7 +321,7 @@ tbody tr { border-top: 1px solid var(--line); }
   .main-nav { gap: 2px; }
   .main-nav a { padding-inline: 6px; font-size: 12px; }
   .research-toolbar, .research-results { padding: 15px; }
-  .research-search input { font-size: 16px; }
+  .research-search input[type="search"] { font-size: 16px; }
 }
 .giants-hero { padding-bottom: 27px; }
 .manager-panel { margin-top: 13px; padding: 16px 18px; }

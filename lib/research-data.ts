@@ -1,5 +1,6 @@
 export const researchSourceUrl = "https://stock.naver.com/research/company";
 export const researchPageSize = 20;
+export type ResearchSearchMode = "company" | "keyword";
 
 export type ResearchReport = {
   id: string;
@@ -19,6 +20,8 @@ export type ResearchPage = {
   hasNext: boolean;
   page: number;
   query: string;
+  mode: ResearchSearchMode | "all";
+  stockCode: string | null;
 };
 
 export type ResearchListing = ResearchPage & {
