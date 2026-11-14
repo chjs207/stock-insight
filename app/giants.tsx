@@ -2,8 +2,6 @@
 
 import { Fragment, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { appHref, workflowUrl } from "../src/config";
-import { CollectionHelp } from "../src/data-status";
 import { requestJson } from "../lib/client-api";
 import { vipManager } from "../lib/ownership";
 import type { AssetManager, HoldingReport, OwnershipCoverage, OwnershipView } from "../lib/ownership";
@@ -66,7 +64,7 @@ function HoldingsTable({ reports }: { reports: HoldingReport[] }) {
           const change = ownership?.change;
           return <Fragment key={corpCode}>
             <tr>
-              <th scope="row"><a href={appHref("?corp=" + corpCode)}>{company}</a><small>{market} {stockCode}</small></th>
+              <th scope="row"><a href={"/?corp=" + corpCode}>{company}</a><small>{market} {stockCode}</small></th>
               <td>{sharesLabel(ownership?.shares)}</td>
               <td><strong>{ratioLabel(ownership?.ratio)}</strong></td>
               <td><span className={"holding-change " + (change == null || change === 0 ? "flat" : change > 0 ? "up" : "down")}>{changeLabel(change)}</span></td>
@@ -103,7 +101,8 @@ export default function GiantsPage() {
   const [actionError, setActionError] = useState("");
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [preparedManager, setPreparedManager] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -122,7 +121,10 @@ export default function GiantsPage() {
       try {
         let data = await giantsRequest<OwnershipView>({ manager }, { signal });
         if (!signal.aborted) setView({ manager, data });
-
+        while (!signal.aborted && data.pending > 0) {
+          data = await giantsRequest<OwnershipView>({ manager }, { method: "POST", signal });
+          if (!signal.aborted) setView({ manager, data });
+        }
       } catch (error) {
         if (!signal.aborted) setDataError(error instanceof Error ? error.message : "지분공시를 읽지 못했습니다.");
       }
@@ -131,9 +133,47 @@ export default function GiantsPage() {
     return () => controller.abort();
   }, [manager, revision]);
 
-  function addManager(event: FormEvent) {
+  async function addManager(event: FormEvent) {
     event.preventDefault();
-    if (name.trim()) setPreparedManager(name.trim());
+    if (!name.trim()) return;
+    setSaving(true);
+    setActionError("");
+    try {
+      const saved = await giantsRequest<AssetManager>({ name: name.trim() }, { method: "PUT" });
+      setOverview((current) => current && !current.managers.some((item) => item.key === saved.key)
+        ? { ...current, managers: [...current.managers, saved] } : current);
+      setManager(saved.key);
+      setName("");
+      setAdding(false);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "운용사를 추가하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sync() {
+    if (!overview) return;
+    const months = [...new Set([overview.coverage.currentMonth, ...overview.coverage.missing])];
+    setActionError("");
+    setSyncing({ done: 0, total: months.length });
+    try {
+      for (let index = 0; index < months.length; index += 2) {
+        const batch = months.slice(index, index + 2);
+        await Promise.all(batch.map((month) => giantsRequest({ month }, { method: "POST" })));
+        setSyncing({ done: index + batch.length, total: months.length });
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "공시 목록을 갱신하지 못했습니다.");
+    } finally {
+      try {
+        setOverview(await giantsRequest<Overview>());
+      } catch {
+        setActionError("공시 목록의 갱신 상태를 확인하지 못했습니다.");
+      }
+      setRevision((value) => value + 1);
+      setSyncing(null);
+    }
   }
 
   const data = view?.manager === manager ? view.data : null;
@@ -153,21 +193,21 @@ export default function GiantsPage() {
         </label>
         <button type="button" className="expand-button" aria-expanded={adding}
           disabled={!overview} onClick={() => setAdding((value) => !value)}>＋ 운용사 추가</button>
-        <a className="expand-button" href={workflowUrl} target="_blank" rel="noreferrer">공시 수집 실행 ↗</a>
+        <button type="button" className="expand-button" disabled={!overview || Boolean(syncing)}
+          onClick={() => void sync()}>{syncing ? "갱신 중…" : "공시 목록 갱신"}</button>
       </div>
       {adding && <form className="manager-form" onSubmit={addManager}>
         <label className="manager-field">DART 공시 제출인명
           <input value={name} onChange={(event) => setName(event.target.value)} maxLength={80}
             placeholder="예시 신영자산운용" required/>
         </label>
-        <button type="submit" className="watch-button">추가 수집 안내</button>
+        <button type="submit" className="watch-button" disabled={saving}>{saving ? "추가 중…" : "추가"}</button>
       </form>}
-      {preparedManager && <CollectionHelp manager={preparedManager}/>}
       {coverage && <p className="giants-period">조회 기간 {dateLabel(coverage.start)}–{dateLabel(coverage.end)}
         {coverage.through ? " · 목록 수집 기준 " + dateLabel(coverage.through) : ""}
         {coverage.missing.length ? " · 미수집 " + coverage.missing.length + "개월" : ""}
       </p>}
-
+      {syncing && <p className="loading" role="status"><span className="spinner"/> 공시 목록 갱신 {syncing.done}/{syncing.total}개월</p>}
       {actionError && <p className="notice error" role="alert">{actionError}</p>}
     </section>
     {dataError && <div className="notice error" role="alert">{dataError}
@@ -175,10 +215,10 @@ export default function GiantsPage() {
     </div>}
     {!data ? (!dataError && <p className="loading" role="status"><span className="spinner"/> 지분공시를 불러오는 중…</p>)
       : data.reports.length === 0 ? <div className="panel giants-empty">
-        {coverage?.missing.length ? "아직 수집된 공시가 없습니다. 자동 수집을 기다리거나 공시 수집을 실행해 주세요."
+        {coverage?.missing.length ? "아직 불러온 공시가 없습니다. 공시 목록 갱신으로 조회 범위를 채울 수 있습니다."
           : "조회 기간에 이 이름으로 접수된 지분공시가 없습니다. DART 공시 제출인명을 확인해 주세요."}
       </div> : <>
-        {data.pending > 0 && !dataError && <p className="notice" role="status">공시 원문 {data.pending}건은 다음 수집에서 이어서 확인합니다. 기존 수집 자료를 먼저 표시합니다.</p>}
+        {data.pending > 0 && !dataError && <p className="loading" role="status"><span className="spinner"/> 공시 원문에서 보유 현황을 읽는 중 · {data.pending}건 남음</p>}
         <HoldingsTable key={manager} reports={data.reports}/>
       </>}
   </>;

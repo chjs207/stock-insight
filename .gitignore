@@ -7,9 +7,14 @@ dist/
 !.env.example
 *appkey*.txt
 *secretkey*.txt
+*appsecret*.txt
 *.sqlite*
 *.db
 .DS_Store
 outputs/
 public/data/
 .sites-runtime/
+.local/
+*.sqlite-*
+*.db-*
+*.bundle

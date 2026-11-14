@@ -1,29 +1,30 @@
 {
-  "name": "stock-insight-pages",
-  "version": "1.0.0",
+  "name": "stock-insight-local",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.18.0" },
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 4195 --strictPort",
+    "dev": "node --use-system-ca --experimental-strip-types server/start.ts --dev",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4196 --strictPort",
+    "start": "node --use-system-ca --experimental-strip-types server/start.ts",
+    "start:lan": "node --use-system-ca --experimental-strip-types server/start.ts --lan",
     "test": "vitest run",
-    "collect": "node --experimental-strip-types scripts/collect.ts",
-    "prepare:data": "node --experimental-strip-types scripts/prepare-data.ts"
+    "db:import": "node --experimental-strip-types server/import.ts"
   },
   "dependencies": {
     "fflate": "^0.8.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "sql.js": "^1.14.0"
+    "lightweight-charts": "^5.2.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260515.1",
-    "@types/node": "^22.19.19",
+    "@types/node": "^24.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/sql.js": "^1.4.9",
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "^5.9.3",
     "vite": "^8.0.13",

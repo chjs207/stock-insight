@@ -186,7 +186,7 @@ export function localDartTransport(url: URL, token?: string): DartTransport | un
 
 export function dartClient(key?: string, transport?: DartTransport) {
   async function request(path: string, params: Record<string, string> = {}) {
-    if (!key?.trim()) throw new MarketError("GitHub Actions Secret에 DART_API_KEY를 등록해 주세요.", 503);
+    if (!key?.trim()) throw new MarketError(".env에 DART_API_KEY를 입력한 뒤 서버를 다시 시작해 주세요.", 503);
     const url = new URL("https://opendart.fss.or.kr/api/" + path);
     url.search = new URLSearchParams({ crtfc_key: key.trim(), ...params }).toString();
     try {

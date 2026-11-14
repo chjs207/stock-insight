@@ -1,0 +1,2 @@
+.site-header { padding-top: env(safe-area-inset-top); }
+.footer { padding-bottom: max(22px, env(safe-area-inset-bottom)); }

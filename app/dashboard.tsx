@@ -8,9 +8,6 @@ import { requestJson } from "../lib/client-api";
 import GiantsPage from "./giants";
 import ValuationPanel from "./valuation";
 import CompanyPriceChart from "./price-chart";
-import AppSettings from "../src/settings";
-import { appHref, basePath } from "../src/config";
-import { SiteDataStatus, CompanyDataStatus } from "../src/data-status";
 
 const figures = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
 const exactFigures = new Intl.NumberFormat("ko-KR");
@@ -384,7 +381,7 @@ function QuarterlyTable({ company, data, setData }: {
 function companyHref(corpCode: string, view?: string) {
   const params = new URLSearchParams({ corp: corpCode });
   if (view) params.set("view", view);
-  return appHref("?" + params);
+  return "/?" + params;
 }
 
 function CompanyIdentity({ company }: { company: Company }) {
@@ -485,7 +482,7 @@ function WatchlistHome() {
         </div>
       </div>
     </section>
-    {configured === false && <p className="notice"><Icon name="info" size={17}/><a href={appHref("?section=settings")}>자료 수집을 완료하면 기업을 검색할 수 있습니다.</a></p>}
+    {configured === false && <p className="notice"><Icon name="info" size={17}/> OpenDART 신규 조회에는 인증키 설정이 필요합니다.</p>}
     {error && <p className="notice error" role="alert"><Icon name="info" size={17}/> {error}</p>}
     {choices.length > 0 && <section className="panel results" aria-labelledby="search-results-title">
       <h2 id="search-results-title">검색 결과</h2><p>상세 화면에서 관심종목을 등록할 수 있습니다.</p>
@@ -505,7 +502,7 @@ function WatchlistHome() {
         : saved.length === 0 ? <div className="watchlist-empty">
           <span className="empty-star"><Icon name="star" size={23}/></span>
           <strong>등록된 관심종목이 없습니다</strong>
-          <p>위에서 기업을 검색한 뒤 상세 화면에서 관심종목 등록을 누르세요. 목록은 이 브라우저에 저장됩니다.</p>
+          <p>위에서 기업을 검색한 뒤 상세 화면에서 관심종목 등록을 누르세요.</p>
         </div> : <ul className="watchlist-items">{saved.map((company) => <li key={company.corpCode} className="watchlist-item">
           <a className="company-row" href={companyHref(company.corpCode)}><CompanyIdentity company={company}/><Icon name="arrow"/></a>
           <a className="watch-chart-link" href={companyHref(company.corpCode, "chart")} aria-label={company.name + " 주가 차트"}><Icon name="chart" size={17}/><span>차트</span></a>
@@ -581,7 +578,7 @@ function CompanyFinancials({ company }: { company: Company }) {
     </div> : !data || !reports || !latest ? <p className="loading" role="status"><span className="spinner"/> 연간 실적을 불러오는 중…</p> : <>
       <div className="financials-meta">
         <span>{reports[0].year}–{latest.year} 사업연도</span>
-        <span className="source-badge"><Icon name="database" size={15}/>{data.source === "DB" ? "수집 자료" : "OpenDART 조회"}</span>
+        <span className="source-badge"><Icon name="database" size={15}/>{data.source === "DB" ? "DB 저장본" : "OpenDART 조회"}</span>
       </div>
       <div className="kpis">
         {metrics.map(({ key, label, color, light }) => {
@@ -626,7 +623,7 @@ function CompanyDetail({ corpCode, view }: { corpCode: string; view?: string }) 
   const selected = companyViews.find((item) => item.key === view) ?? companyViews[0];
   const Content = selected.content;
   return <>
-    <a className="back-link" href={appHref()}><Icon name="back" size={16}/> 관심종목 목록</a>
+    <a className="back-link" href="/"><Icon name="back" size={16}/> 관심종목 목록</a>
     {error ? <p className="notice error" role="alert"><Icon name="info" size={17}/> {error}</p>
       : !company ? <p className="loading" role="status"><span className="spinner"/> 기업 정보를 불러오는 중…</p> : <>
         <section className="panel company-detail" aria-labelledby="company-name">
@@ -644,33 +641,30 @@ function CompanyDetail({ corpCode, view }: { corpCode: string; view?: string }) 
               aria-current={item.key === selected.key ? "page" : undefined}><Icon name={item.icon} size={17}/>{item.label}</a>)}
           </nav>
         </section>
-        <CompanyDataStatus company={company}/>
         <Content company={company}/>
       </>}
   </>;
 }
 
-export default function Dashboard({ corpCode, view, giants, settings }: { corpCode?: string; view?: string; giants?: boolean; settings?: boolean }) {
+export default function Dashboard({ corpCode, view, giants }: { corpCode?: string; view?: string; giants?: boolean }) {
   return <>
     <header className="site-header">
       <div className="shell topbar">
-        <a className="brand" href={appHref()} aria-label="스탁인사이트 홈"><img src={basePath + "favicon.svg"} width="37" height="37" alt=""/><span>스탁인사이트</span></a>
+        <a className="brand" href="/" aria-label="스탁인사이트 홈"><img src="/favicon.svg" width="37" height="37" alt=""/><span>스탁인사이트</span></a>
         <span className="header-divider"/>
         <span className="header-caption">기업 재무 리서치</span>
         <div className="header-meta"><span className="market-badge">KOSPI</span><span className="market-badge">KOSDAQ</span></div>
       </div>
       <nav className="shell main-nav" aria-label="메인 메뉴">
-        <a href={appHref()} aria-current={!giants && !settings ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
-        <a href={appHref("?section=giants")} aria-current={giants ? "page" : undefined}><Icon name="table" size={16}/> 거인의 어깨</a>
-        <a href={appHref("?section=settings")} aria-current={settings ? "page" : undefined}><Icon name="info" size={16}/> 자료 · 설정</a>
+        <a href="/" aria-current={!giants ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
+        <a href="/?section=giants" aria-current={giants ? "page" : undefined}><Icon name="table" size={16}/> 거인의 어깨</a>
       </nav>
     </header>
     <main className="shell">
-      <SiteDataStatus/>
-      {settings ? <AppSettings/> : giants ? <GiantsPage/> : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <WatchlistHome/>}
+      {giants ? <GiantsPage/> : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <WatchlistHome/>}
     </main>
     <footer className="shell footer">
-      <span>스탁인사이트 <span className="footer-version">웹 v1.0</span></span>
+      <span>스탁인사이트 <span className="footer-version">로컬 v1.1</span></span>
       <a href="https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS003&apiId=2019020" target="_blank" rel="noreferrer">금융감독원 OpenDART <Icon name="external" size={14}/></a>
     </footer>
   </>;

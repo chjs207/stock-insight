@@ -1,8 +1,8 @@
-import { pagesRequest } from "../src/runtime";
-
 export async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
-  if (options?.signal?.aborted) throw new DOMException("요청이 취소되었습니다.", "AbortError");
-  const result = await pagesRequest<T>(url, options);
-  if (options?.signal?.aborted) throw new DOMException("요청이 취소되었습니다.", "AbortError");
-  return result;
+  const response = await fetch(url, { ...options, credentials: "same-origin" });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(result.error || "조회 중 오류가 발생했습니다. 다시 시도해 주세요.");
+  }
+  return response.json() as Promise<T>;
 }
