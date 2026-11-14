@@ -395,15 +395,12 @@ function CompanyIdentity({ company }: { company: Company }) {
   </span>;
 }
 
-function WatchlistHome() {
+function FinancialSearchPage() {
   const [query, setQuery] = useState("");
   const [choices, setChoices] = useState<Company[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [saved, setSaved] = useState<Company[] | null>(null);
-  const [watchError, setWatchError] = useState("");
-  const [attempt, setAttempt] = useState(0);
   const search = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -412,29 +409,6 @@ function WatchlistHome() {
       .then((result) => setConfigured(result.configured)).catch(() => {});
     return () => { controller.abort(); search.current?.abort(); };
   }, []);
-
-  useEffect(() => {
-    let controller: AbortController;
-    function refresh() {
-      controller?.abort();
-      controller = new AbortController();
-      const { signal } = controller;
-      setWatchError("");
-      requestJson<{ companies: Company[] }>("/api/watchlist", { signal }).then(
-        ({ companies }) => { if (!signal.aborted) setSaved(companies); },
-        () => { if (!signal.aborted) setWatchError("관심종목 목록을 불러오지 못했습니다."); },
-      );
-    }
-    function restore(event: PageTransitionEvent) {
-      if (event.persisted) refresh();
-    }
-    refresh();
-    window.addEventListener("pageshow", restore);
-    return () => {
-      controller.abort();
-      window.removeEventListener("pageshow", restore);
-    };
-  }, [attempt]);
 
   async function run(term: string) {
     search.current?.abort();
@@ -470,8 +444,8 @@ function WatchlistHome() {
       <HeroChart/>
       <div className="hero-content">
         <div className="eyebrow"><span className="dot"/> KOSPI · KOSDAQ</div>
-        <h1 id="page-title">관심종목</h1>
-        <p>기업을 검색해 관심종목에 담고, 재무와 주가 흐름을 확인하세요.</p>
+        <h1 id="page-title">재무검색</h1>
+        <p>기업을 검색해 재무와 주가 흐름을 확인하고, 관심종목에 등록하세요.</p>
         <form className="search" onSubmit={submit} role="search">
           <Icon name="search" size={21}/>
           <input type="search" value={query} maxLength={60} onChange={(event) => setQuery(event.target.value)}
@@ -492,6 +466,54 @@ function WatchlistHome() {
         <a className="company-row" href={companyHref(company.corpCode)}><CompanyIdentity company={company}/><Icon name="arrow"/></a>
       </li>)}</ul>
     </section>}
+  </>;
+}
+
+function WatchlistPage() {
+  const [saved, setSaved] = useState<Company[] | null>(null);
+  const [watchError, setWatchError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let controller: AbortController;
+    function refresh() {
+      controller?.abort();
+      controller = new AbortController();
+      const { signal } = controller;
+      setWatchError("");
+      requestJson<{ companies: Company[] }>("/api/watchlist", { signal }).then(
+        ({ companies }) => { if (!signal.aborted) setSaved(companies); },
+        () => { if (!signal.aborted) setWatchError("관심종목 목록을 불러오지 못했습니다."); },
+      );
+    }
+    function restore(event: PageTransitionEvent) { if (event.persisted) refresh(); }
+    refresh();
+    window.addEventListener("pageshow", restore);
+    return () => { controller.abort(); window.removeEventListener("pageshow", restore); };
+  }, [attempt]);
+
+  async function remove(company: Company) {
+    if (removing) return;
+    setRemoving(company.corpCode); setActionError(""); setNotice("");
+    try {
+      await requestJson("/api/watchlist?" + new URLSearchParams({ corp: company.corpCode }), { method: "DELETE" });
+      setSaved(current => current?.filter(item => item.corpCode !== company.corpCode) ?? null);
+      setNotice(company.name + " 관심종목 등록을 해제했습니다.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "관심종목을 해제하지 못했습니다.");
+    } finally { setRemoving(null); }
+  }
+
+  return <>
+    <section className="hero watchlist-hero" aria-labelledby="watchlist-page-title">
+      <div className="eyebrow"><span className="dot"/> MY WATCHLIST</div>
+      <h1 id="watchlist-page-title">관심종목</h1>
+      <p>등록한 기업의 재무와 차트를 확인하고, 관심종목을 관리하세요.</p>
+      <a href="/" className="watch-button watchlist-add-link"><Icon name="plus" size={16}/> 기업 검색·추가</a>
+    </section>
     <section className="panel watchlist" aria-labelledby="watchlist-title">
       <div className="watchlist-head">
         <span className="panel-icon"><Icon name="star"/></span>
@@ -499,16 +521,23 @@ function WatchlistHome() {
         {saved && <span className="watch-count">{saved.length}개</span>}
       </div>
       {watchError ? <div className="watchlist-empty">
-        <p role="alert">{watchError}</p><button className="expand-button" onClick={() => setAttempt(attempt + 1)}>다시 조회</button>
+        <p role="alert">{watchError}</p><button className="expand-button" onClick={() => setAttempt(value => value + 1)}>다시 조회</button>
       </div> : !saved ? <p className="loading watchlist-loading" role="status"><span className="spinner"/> 관심종목을 불러오는 중…</p>
         : saved.length === 0 ? <div className="watchlist-empty">
           <span className="empty-star"><Icon name="star" size={23}/></span>
           <strong>등록된 관심종목이 없습니다</strong>
-          <p>위에서 기업을 검색한 뒤 상세 화면에서 관심종목 등록을 누르세요.</p>
+          <p>재무검색에서 기업을 찾은 뒤 상세 화면에서 관심종목을 등록하세요.</p>
+          <a href="/" className="watch-button">재무검색으로 이동</a>
         </div> : <ul className="watchlist-items">{saved.map((company) => <li key={company.corpCode} className="watchlist-item">
           <a className="company-row" href={companyHref(company.corpCode)}><CompanyIdentity company={company}/><Icon name="arrow"/></a>
           <a className="watch-chart-link" href={companyHref(company.corpCode, "chart")} aria-label={company.name + " 주가 차트"}><Icon name="chart" size={17}/><span>차트</span></a>
+          <button type="button" className="watch-remove-button" disabled={Boolean(removing)}
+            aria-label={company.name + " 관심종목 해제"} onClick={() => void remove(company)}>
+            {removing === company.corpCode ? "해제 중…" : "해제"}
+          </button>
         </li>)}</ul>}
+      {actionError && <p className="notice error" role="alert">{actionError}</p>}
+      {notice && <p className="watchlist-action-notice" role="status">{notice}</p>}
     </section>
   </>;
 }
@@ -625,7 +654,10 @@ function CompanyDetail({ corpCode, view }: { corpCode: string; view?: string }) 
   const selected = companyViews.find((item) => item.key === view) ?? companyViews[0];
   const Content = selected.content;
   return <>
-    <a className="back-link" href="/"><Icon name="back" size={16}/> 관심종목 목록</a>
+    <div className="detail-backlinks">
+      <a className="back-link" href="/"><Icon name="back" size={16}/> 재무검색</a>
+      <a className="back-link" href="/?section=watchlist"><Icon name="star" size={16}/> 관심종목 목록</a>
+    </div>
     {error ? <p className="notice error" role="alert"><Icon name="info" size={17}/> {error}</p>
       : !company ? <p className="loading" role="status"><span className="spinner"/> 기업 정보를 불러오는 중…</p> : <>
         <section className="panel company-detail" aria-labelledby="company-name">
@@ -651,6 +683,7 @@ function CompanyDetail({ corpCode, view }: { corpCode: string; view?: string }) 
 export default function Dashboard({ corpCode, view, section }: { corpCode?: string; view?: string; section?: string }) {
   const giants = section === "giants";
   const research = section === "research";
+  const watchlist = section === "watchlist";
   return <>
     <header className="site-header">
       <div className="shell topbar">
@@ -660,13 +693,15 @@ export default function Dashboard({ corpCode, view, section }: { corpCode?: stri
         <div className="header-meta"><span className="market-badge">KOSPI</span><span className="market-badge">KOSDAQ</span></div>
       </div>
       <nav className="shell main-nav" aria-label="메인 메뉴">
-        <a href="/" aria-current={!giants && !research ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
+        <a href="/" aria-current={!giants && !research && !watchlist ? "page" : undefined}><Icon name="search" size={16}/> 재무검색</a>
         <a href="/?section=giants" aria-current={giants ? "page" : undefined}><Icon name="table" size={16}/> 거인의 어깨</a>
         <a href="/?section=research" aria-current={research ? "page" : undefined}><Icon name="research" size={16}/> 기업 리서치</a>
+        <a href="/?section=watchlist" aria-current={watchlist ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
       </nav>
     </header>
     <main className="shell">
-      {research ? <CompanyResearch/> : giants ? <GiantsPage/> : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <WatchlistHome/>}
+      {research ? <CompanyResearch/> : giants ? <GiantsPage/> : watchlist ? <WatchlistPage/>
+        : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <FinancialSearchPage/>}
     </main>
     <footer className="shell footer">
       <span>스탁인사이트 <span className="footer-version">로컬 v1.1</span></span>
