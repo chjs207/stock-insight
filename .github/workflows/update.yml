@@ -33,7 +33,13 @@ permissions:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'chjs207/stock-insight' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+        ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+          github.actor == github.repository_owner &&
+          github.triggering_actor == github.repository_owner))
     runs-on: ubuntu-latest
     timeout-minutes: 50
     permissions:
@@ -64,6 +70,9 @@ jobs:
           fi
       - name: Collect DART and public market data
         id: collect
+        # Deploying source changes never uses the DART key or quota.
+        # The job gate restricts scheduled/manual collection to the owner.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           COLLECT_COMPANIES: ${{ inputs.companies }}
@@ -73,7 +82,9 @@ jobs:
           COLLECT_DETAILS: ${{ (inputs.full_history || steps.data.outputs.first_run == 'true') && '500' || '120' }}
         run: npm run collect
       - name: Persist public database and last good snapshots
-        if: ${{ always() && steps.data.outcome == 'success' }}
+        if: >-
+          always() && steps.data.outcome == 'success' &&
+          (steps.collect.outcome == 'success' || steps.collect.outcome == 'failure')
         shell: bash
         run: |
           if [ -f .data/cache.json ]; then
@@ -85,6 +96,16 @@ jobs:
               git push origin "$DATA_COMMIT:refs/heads/data"
             fi
           fi
+      - name: Report deployment without API collection
+        if: github.event_name == 'push'
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ## 저장된 자료로 화면만 배포
+
+          이번 코드 배포에서는 DART 수집을 실행하지 않았으며 DART API 호출은 0회입니다.
+          data 브랜치에 저장된 기존 자료를 사용했습니다.
+          자료 갱신은 소유자의 예약 실행 또는 수동 Run workflow에서 수행합니다.
+          SUMMARY
       - run: npm run prepare:data
       - uses: actions/configure-pages@v5
       - name: Build static site
