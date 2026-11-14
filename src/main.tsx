@@ -27,7 +27,7 @@ function LocalApp() {
   const params = new URLSearchParams(query);
   const corp = params.get("corp") ?? "";
   return <div onClickCapture={navigate}><Dashboard corpCode={/^\d{8}$/.test(corp) ? corp : undefined}
-    view={params.get("view") ?? undefined} giants={params.get("section") === "giants"}/></div>;
+    view={params.get("view") ?? undefined} section={params.get("section") ?? undefined}/></div>;
 }
 
 createRoot(document.getElementById("root")!).render(<LocalApp/>);

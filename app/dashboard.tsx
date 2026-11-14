@@ -6,6 +6,7 @@ import { changePercent, growth, metrics } from "../lib/market";
 import type { AnnualReport, Company, Financials, Metric, QuarterlyFinancials, QuarterlyYear, QuarterReport } from "../lib/market";
 import { requestJson } from "../lib/client-api";
 import GiantsPage from "./giants";
+import CompanyResearch from "./company-research";
 import ValuationPanel from "./valuation";
 import CompanyPriceChart from "./price-chart";
 
@@ -38,6 +39,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     external: <path d="M13 5h6v6m0-6-9 9m8-1v6H5V6h6"/>,
     chart: <path d="M4 5v15h16M7 15l4-5 4 2 4-6"/>,
     table: <><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 10v9"/></>,
+    research: <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></>,
     database: <><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 4 14 4 14 0V6M5 12c0 4 14 4 14 0"/></>,
     info: <><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5m0-8v.1"/></>,
     revenue: <path d="M5 19V13m7 6V9m7 10V5"/>,
@@ -646,7 +648,9 @@ function CompanyDetail({ corpCode, view }: { corpCode: string; view?: string }) 
   </>;
 }
 
-export default function Dashboard({ corpCode, view, giants }: { corpCode?: string; view?: string; giants?: boolean }) {
+export default function Dashboard({ corpCode, view, section }: { corpCode?: string; view?: string; section?: string }) {
+  const giants = section === "giants";
+  const research = section === "research";
   return <>
     <header className="site-header">
       <div className="shell topbar">
@@ -656,12 +660,13 @@ export default function Dashboard({ corpCode, view, giants }: { corpCode?: strin
         <div className="header-meta"><span className="market-badge">KOSPI</span><span className="market-badge">KOSDAQ</span></div>
       </div>
       <nav className="shell main-nav" aria-label="메인 메뉴">
-        <a href="/" aria-current={!giants ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
+        <a href="/" aria-current={!giants && !research ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
         <a href="/?section=giants" aria-current={giants ? "page" : undefined}><Icon name="table" size={16}/> 거인의 어깨</a>
+        <a href="/?section=research" aria-current={research ? "page" : undefined}><Icon name="research" size={16}/> 기업 리서치</a>
       </nav>
     </header>
     <main className="shell">
-      {giants ? <GiantsPage/> : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <WatchlistHome/>}
+      {research ? <CompanyResearch/> : giants ? <GiantsPage/> : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <WatchlistHome/>}
     </main>
     <footer className="shell footer">
       <span>스탁인사이트 <span className="footer-version">로컬 v1.1</span></span>
