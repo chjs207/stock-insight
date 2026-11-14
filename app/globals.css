@@ -274,6 +274,14 @@ tbody tr { border-top: 1px solid var(--line); }
 .manager-field :is(select,input) { min-height: 38px; padding: 5px 8px; border: 1px solid #cfe0d7; border-radius: 8px; background: white; color: var(--ink); font: inherit; font-size: 14px; }
 .manager-field select { max-width: min(100%, 400px); }
 .manager-form { margin-top: 13px; }
+.manager-delete-button { min-height: 38px; padding: 6px 11px; border: 1px solid #e5c5c1; border-radius: 8px; background: #fff7f6; color: #8a302b; font: inherit; font-size: 13px; font-weight: 750; }
+.manager-delete-button:hover:enabled { background: #fbe8e5; border-color: #d89c95; }
+.manager-delete-button:disabled { opacity: .6; }
+.manager-removal { margin-top: 15px; padding: 14px 16px; border: 1px solid #e9cfca; border-radius: 10px; background: #fff8f6; }
+.manager-removal h3 { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.manager-removal p { margin: 6px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.manager-removal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.manager-action-notice { margin: 12px 0 0; color: var(--deep); font-size: 12px; line-height: 1.6; }
 .manager-registration { margin-top: 15px; padding: 16px; border: 1px solid #d9e5de; border-radius: 10px; background: #f8fbf9; }
 .manager-registration h3 { margin: 0 0 7px; font-size: 15px; }
 .manager-registration > p, .manager-preview-empty { color: var(--muted); font-size: 12px; line-height: 1.7; }

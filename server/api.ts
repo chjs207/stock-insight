@@ -54,6 +54,10 @@ export function createApi(db: D1Database, dartKey: string, transport: DartTransp
         const manager = params.get("manager");
         if (method === "GET" && params.get("preview") === "1") return json(await service.previewManager(params.get("name") ?? ""));
         if (method === "PUT") return json(await service.addManager(params.get("name") ?? ""));
+        if (method === "DELETE") {
+          await service.removeManager(manager ?? "");
+          return json({ managers: await service.managers() });
+        }
         if (method === "POST" && !manager) { await service.syncMonth(params.get("month") ?? ""); return json({ synced: true }); }
         if (manager) {
           if (method === "POST") await service.syncDetails(manager);

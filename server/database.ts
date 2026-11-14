@@ -24,7 +24,7 @@ export function openDatabase(path: string) {
   const sql = new DatabaseSync(path);
   try {
     sql.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS local_migrations (id INTEGER PRIMARY KEY)");
-    const files = ["0000_market_cache", "0001_quarterly_cache", "0002_watchlist", "0003_ownership", "0004_market_quotes", "0005_price_history"];
+    const files = ["0000_market_cache", "0001_quarterly_cache", "0002_watchlist", "0003_ownership", "0004_market_quotes", "0005_price_history", "0006_default_manager"];
     for (const [id, file] of files.entries()) {
       if (sql.prepare("SELECT 1 FROM local_migrations WHERE id=?").get(id)) continue;
       sql.exec("BEGIN");

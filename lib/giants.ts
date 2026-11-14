@@ -86,7 +86,7 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
 
   async function managers(): Promise<AssetManager[]> {
     const rows = await db.prepare("SELECT key, name FROM asset_managers ORDER BY added_at, name").all<AssetManager>();
-    return [vipManager, ...rows.results.filter((manager) => manager.key !== vipManager.key)];
+    return rows.results;
   }
 
   async function addManager(input: string): Promise<AssetManager> {
@@ -98,12 +98,19 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
       throw new MarketError("최근 3년 내 조회된 지분공시가 없어 등록할 수 없습니다. DART 공시 제출인명을 확인해 주세요.", 400);
     }
     const { key, name } = result.manager;
-    if (key === vipManager.key) return vipManager;
     await db.prepare("INSERT OR IGNORE INTO asset_managers (key, name, added_at) VALUES (?, ?, ?)")
       .bind(key, name, now.getTime()).run();
     const saved = await db.prepare("SELECT key, name FROM asset_managers WHERE key = ?").bind(key).first<AssetManager>();
     if (!saved) throw new MarketError("운용사를 저장하지 못했습니다.");
     return saved;
+  }
+
+  async function removeManager(input: string) {
+    const key = managerKey(input.trim());
+    if (!key || input.length > 80 || !/[가-힣a-z0-9]/i.test(key)) {
+      throw new MarketError("삭제할 운용사를 선택해 주세요.", 400);
+    }
+    await db.prepare("DELETE FROM asset_managers WHERE key = ?").bind(key).run();
   }
 
   async function syncMonth(month: string) {
@@ -177,14 +184,12 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
     // Preview reads collected filings only and never registers a manager.
     // Use the filer name from an actual in-range report, not an unchecked input.
     return { ...view, manager: { key, name: view.reports[0]?.filer ?? name },
-      registered: key === vipManager.key || Boolean(saved), coverage: range };
+      registered: Boolean(saved), coverage: range };
   }
 
   async function snapshot(key: string): Promise<OwnershipView> {
-    if (key !== vipManager.key) {
-      const exists = await db.prepare("SELECT 1 FROM asset_managers WHERE key = ?").bind(key).first();
-      if (!exists) throw new MarketError("추가한 운용사를 선택해 주세요.", 404);
-    }
+    const exists = await db.prepare("SELECT 1 FROM asset_managers WHERE key = ?").bind(key).first();
+    if (!exists) throw new MarketError("추가한 운용사를 선택해 주세요.", 404);
     return readReports(key);
   }
 
@@ -203,5 +208,5 @@ export function giantsService(db: D1Database, key?: string, transport?: DartTran
     return missing.length;
   }
 
-  return { coverage, managers, previewManager, addManager, syncMonth, snapshot, syncDetails };
+  return { coverage, managers, previewManager, addManager, removeManager, syncMonth, snapshot, syncDetails };
 }

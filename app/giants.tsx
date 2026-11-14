@@ -3,7 +3,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { requestJson } from "../lib/client-api";
 import ManagerRegistration from "./manager-registration";
-import { vipManager } from "../lib/ownership";
 import type { AssetManager, HoldingReport, OwnershipCoverage, OwnershipView } from "../lib/ownership";
 
 type Overview = { managers: AssetManager[]; coverage: OwnershipCoverage };
@@ -94,18 +93,21 @@ function HoldingsTable({ reports }: { reports: HoldingReport[] }) {
 
 export default function GiantsPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [manager, setManager] = useState(vipManager.key);
+  const [manager, setManager] = useState("");
   const [revision, setRevision] = useState(0);
   const [view, setView] = useState<{ manager: string; data: OwnershipView } | null>(null);
   const [dataError, setDataError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
   const [adding, setAdding] = useState(false);
+  const [removal, setRemoval] = useState<AssetManager | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [syncing, setSyncing] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     giantsRequest<Overview>({}, { signal: controller.signal }).then(
-      (data) => { if (!controller.signal.aborted) setOverview(data); },
+      (data) => { if (!controller.signal.aborted) { setOverview(data); setManager(data.managers[0]?.key ?? ""); } },
       (error) => { if (!controller.signal.aborted) setActionError(error.message); },
     );
     return () => controller.abort();
@@ -115,6 +117,7 @@ export default function GiantsPage() {
     const controller = new AbortController();
     const { signal } = controller;
     setDataError("");
+    if (!manager) { setView(null); return () => controller.abort(); }
     async function load() {
       try {
         let data = await giantsRequest<OwnershipView>({ manager }, { signal });
@@ -136,11 +139,31 @@ export default function GiantsPage() {
       ? { ...current, managers: [...current.managers, saved] } : current);
     setManager(saved.key);
     setAdding(false);
+    setActionNotice("");
+    setActionError("");
+  }
+
+  async function removeManager() {
+    if (!removal || deleting) return;
+    setDeleting(true);
+    setActionError("");
+    try {
+      const result = await giantsRequest<{ managers: AssetManager[] }>({ manager: removal.key }, { method: "DELETE" });
+      setOverview(current => current && { ...current, managers: result.managers });
+      setManager(result.managers[0]?.key ?? "");
+      setView(null);
+      setDataError("");
+      setActionNotice(removal.name + " 등록을 삭제했습니다.");
+      setRemoval(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "운용사를 삭제하지 못했습니다.");
+    } finally { setDeleting(false); }
   }
 
   async function sync() {
     if (!overview) return;
     setAdding(false);
+    setActionNotice("");
     const months = [...new Set([overview.coverage.currentMonth, ...overview.coverage.missing])];
     setActionError("");
     setSyncing({ done: 0, total: months.length });
@@ -165,24 +188,42 @@ export default function GiantsPage() {
 
   const data = view?.manager === manager ? view.data : null;
   const coverage = overview?.coverage;
+  const selectedManager = overview?.managers.find(item => item.key === manager);
+  const controlsBusy = Boolean(syncing) || Boolean(removal) || deleting;
   return <>
     <section className="hero giants-hero" aria-labelledby="giants-title">
       <div className="eyebrow"><span className="dot"/> DART 지분공시</div>
       <h1 id="giants-title">거인의 어깨</h1>
       <p>운용사가 최근 3년 동안 공시한 보유 종목과 지분 변동을 확인하세요.</p>
     </section>
-    <section className="panel manager-panel" aria-label="운용사 선택과 추가">
+    <section className="panel manager-panel" aria-label="운용사 관리">
       <div className="manager-bar">
         <label className="manager-field">자산운용사
-          <select value={manager} onChange={(event) => setManager(event.target.value)}>
-            {(overview?.managers ?? [vipManager]).map(({ key, name }) => <option value={key} key={key}>{name}</option>)}
+          <select value={manager} disabled={!overview?.managers.length || controlsBusy}
+            onChange={(event) => { setManager(event.target.value); setActionNotice(""); setActionError(""); }}>
+            {!overview?.managers.length && <option value="">{overview ? "등록된 운용사 없음" : "불러오는 중…"}</option>}
+            {overview?.managers.map(({ key, name }) => <option value={key} key={key}>{name}</option>)}
           </select>
         </label>
         <button type="button" className="expand-button" aria-expanded={adding}
-          disabled={!overview || Boolean(syncing)} onClick={() => setAdding(true)}>＋ 운용사 추가</button>
-        <button type="button" className="expand-button" disabled={!overview || Boolean(syncing)}
+          disabled={!overview || controlsBusy} onClick={() => { setAdding(true); setActionNotice(""); }}>＋ 운용사 추가</button>
+        <button type="button" className="manager-delete-button" aria-expanded={Boolean(removal)}
+          disabled={!selectedManager || controlsBusy} onClick={() => {
+            if (selectedManager) { setRemoval(selectedManager); setAdding(false); setActionNotice(""); setActionError(""); }
+          }}>운용사 삭제</button>
+        <button type="button" className="expand-button" disabled={!overview || controlsBusy}
           onClick={() => void sync()}>{syncing ? "갱신 중…" : "공시 목록 갱신"}</button>
       </div>
+      {removal && <div className="manager-removal" role="group" aria-labelledby="manager-removal-heading">
+        <h3 id="manager-removal-heading">‘{removal.name}’ 등록을 삭제할까요?</h3>
+        <p>수집한 공시는 유지되며, 공시 조회 후 다시 등록할 수 있습니다.</p>
+        <div className="manager-removal-actions">
+          <button type="button" className="manager-delete-button" disabled={deleting}
+            onClick={() => void removeManager()}>{deleting ? "삭제 중…" : "삭제"}</button>
+          <button type="button" className="expand-button" disabled={deleting}
+            onClick={() => { setRemoval(null); setActionError(""); }}>취소</button>
+        </div>
+      </div>}
       {adding && <ManagerRegistration onComplete={selectManager} onCancel={() => setAdding(false)} onRefresh={() => void sync()}/>}
       {coverage && <p className="giants-period">조회 기간 {dateLabel(coverage.start)}–{dateLabel(coverage.end)}
         {coverage.through ? " · 목록 수집 기준 " + dateLabel(coverage.through) : ""}
@@ -190,11 +231,14 @@ export default function GiantsPage() {
       </p>}
       {syncing && <p className="loading" role="status"><span className="spinner"/> 공시 목록 갱신 {syncing.done}/{syncing.total}개월</p>}
       {actionError && <p className="notice error" role="alert">{actionError}</p>}
+      {actionNotice && <p className="manager-action-notice" role="status">{actionNotice}</p>}
     </section>
     {dataError && <div className="notice error" role="alert">{dataError}
       <button type="button" className="expand-button" onClick={() => setRevision((value) => value + 1)}>다시 조회</button>
     </div>}
-    {!data ? (!dataError && <p className="loading" role="status"><span className="spinner"/> 지분공시를 불러오는 중…</p>)
+    {overview && !overview.managers.length ? <div className="panel giants-empty" role="status">
+      등록된 자산운용사가 없습니다. 운용사 추가에서 공시 내역을 확인하고 등록해 주세요.
+    </div> : !data ? (!dataError && !actionError && <p className="loading" role="status"><span className="spinner"/> 지분공시를 불러오는 중…</p>)
       : data.reports.length === 0 ? <div className="panel giants-empty">
         {coverage?.missing.length ? "아직 불러온 공시가 없습니다. 공시 목록 갱신으로 조회 범위를 채울 수 있습니다."
           : "조회 기간에 이 이름으로 접수된 지분공시가 없습니다. DART 공시 제출인명을 확인해 주세요."}

@@ -85,6 +85,10 @@ test("HTTP serves only built assets and rejects file disclosure and cross-site A
     expect(api).not.toHaveBeenCalled();
     expect((await fetch(base + "/api/market?status=1")).status).toBe(200);
     expect(api).toHaveBeenCalledTimes(1);
+    expect((await fetch(base + "/api/giants?manager=test", { method: "DELETE", headers: { Origin: "https://untrusted.example" } })).status).toBe(403);
+    expect(api).toHaveBeenCalledTimes(1);
+    expect((await fetch(base + "/api/giants?manager=test", { method: "DELETE" })).status).toBe(200);
+    expect(api).toHaveBeenLastCalledWith(new URL(base + "/api/giants?manager=test"), "DELETE");
   } finally { server.closeIdleConnections(); await new Promise<void>(accept => server.close(() => accept())); }
 });
 
