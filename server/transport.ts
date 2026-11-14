@@ -10,13 +10,15 @@ export function serverTransport(config: Configuration): DartTransport {
   return (path, params) => {
     if (path === "kiwoom/chart") return kiwoom.chart(params.stockCode).then(result => Response.json(result.body, { status: result.status }));
     const quote = /^quotes\/(KOSPI|KOSDAQ)$/.test(path);
-    if (!quote && !/^(corpCode\.xml|company\.json|fnlttSinglAcntAll\.json|list\.json|document\.xml)$/.test(path)) {
+    const research = path === "research/company";
+    if (!research && !quote && !/^(corpCode\.xml|company\.json|fnlttSinglAcntAll\.json|list\.json|document\.xml)$/.test(path)) {
       return Promise.reject(new MarketError("지원하지 않는 조회 경로입니다.", 400));
     }
     const next = queue.then(async () => {
-      const url = new URL(quote ? "https://m.stock.naver.com/api/stocks/marketValue/" + path.slice(7)
+      const url = new URL(research ? "https://stock.naver.com/api/stockSecurity/researches/v2/company"
+        : quote ? "https://m.stock.naver.com/api/stocks/marketValue/" + path.slice(7)
         : "https://opendart.fss.or.kr/api/" + path);
-      url.search = new URLSearchParams(quote ? params : { ...params, crtfc_key: config.dartKey }).toString();
+      url.search = new URLSearchParams(quote || research ? params : { ...params, crtfc_key: config.dartKey }).toString();
       for (let attempt = 0; attempt < 3; attempt++) {
         await delay(attempt ? 1000 * 2 ** attempt : 200);
         try {
@@ -25,7 +27,8 @@ export function serverTransport(config: Configuration): DartTransport {
           return new Response(await response.arrayBuffer(), { status: response.status, headers: response.headers });
         } catch { /* Credential-bearing URLs and upstream exceptions stay on the server. */ }
       }
-      throw new MarketError(quote ? "시가총액 조회에 실패했습니다." : "OpenDART에 연결하지 못했습니다. 잠시 후 다시 조회해 주세요.");
+      throw new MarketError(research ? "네이버 리서치 목록에 연결하지 못했습니다. 잠시 후 다시 조회해 주세요."
+        : quote ? "시가총액 조회에 실패했습니다." : "OpenDART에 연결하지 못했습니다. 잠시 후 다시 조회해 주세요.");
     });
     queue = next.catch(() => {});
     return next;

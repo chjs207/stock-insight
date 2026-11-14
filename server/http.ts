@@ -35,7 +35,7 @@ export function httpApplication(api: Api, options: { port: number; lan: boolean;
       if (url.origin !== "http://" + host) { response.writeHead(403).end(); return; }
       const method = request.method ?? "GET";
       if (url.pathname.startsWith("/api/")) {
-        const allowed: Record<string, string[]> = { "/api/market": ["GET"], "/api/watchlist": ["GET", "PUT", "DELETE"], "/api/giants": ["GET", "PUT", "POST", "DELETE"] };
+        const allowed: Record<string, string[]> = { "/api/market": ["GET"], "/api/research": ["GET"], "/api/watchlist": ["GET", "PUT", "DELETE"], "/api/giants": ["GET", "PUT", "POST", "DELETE"] };
         if (!allowed[url.pathname]) { response.writeHead(404).end(); return; }
         if (!allowed[url.pathname].includes(method)) { response.writeHead(405, { Allow: allowed[url.pathname].join(", ") }).end(); return; }
         const origin = request.headers.origin;
