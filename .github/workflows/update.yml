@@ -1,0 +1,111 @@
+name: 자료 수집 및 Pages 배포
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 10,22 * * *' # 19:17, 07:17 Asia/Seoul
+  workflow_dispatch:
+    inputs:
+      companies:
+        description: '추가할 기업명 또는 종목코드 (쉼표로 구분, 예: 005930,204620)'
+        type: string
+        required: false
+      managers:
+        description: '추가할 자산운용사명 (DART 제출인명, 쉼표로 구분)'
+        type: string
+        required: false
+      quarter_years:
+        description: '분기 수집 연수 (3–20, 제공 시작은 2015년)'
+        type: string
+        default: '5'
+      full_history:
+        description: '미수집 지분공시 3년 전체 이어서 수집'
+        type: boolean
+        default: true
+
+concurrency:
+  group: stock-insight-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: write # Only the public cache on the data branch is updated.
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Restore persistent public database
+        id: data
+        shell: bash
+        run: |
+          git ls-remote --heads origin refs/heads/data > "$RUNNER_TEMP/stock-insight-data-ref"
+          if [ -s "$RUNNER_TEMP/stock-insight-data-ref" ]; then
+            git fetch --depth=1 origin data
+            git worktree add --detach .data FETCH_HEAD
+            echo "first_run=false" >> "$GITHUB_OUTPUT"
+          else
+            git worktree add --detach .data HEAD
+            git -C .data checkout --orphan data
+            git -C .data rm -rf .
+            echo "first_run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Collect DART and public market data
+        id: collect
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          COLLECT_COMPANIES: ${{ inputs.companies }}
+          COLLECT_MANAGERS: ${{ inputs.managers }}
+          COLLECT_QUARTER_YEARS: ${{ inputs.quarter_years }}
+          COLLECT_MONTHS: ${{ (inputs.full_history || steps.data.outputs.first_run == 'true') && '37' || '6' }}
+          COLLECT_DETAILS: ${{ (inputs.full_history || steps.data.outputs.first_run == 'true') && '500' || '120' }}
+        run: npm run collect
+      - name: Persist public database and last good snapshots
+        if: ${{ always() && steps.data.outcome == 'success' }}
+        shell: bash
+        run: |
+          if [ -f .data/cache.json ]; then
+            git -C .data add -- cache.json
+            if [ -d .data/site ]; then git -C .data add -- site; fi
+            if ! git -C .data diff --cached --quiet; then
+              git -C .data -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Update public financial cache'
+              DATA_COMMIT=$(git -C .data rev-parse HEAD)
+              git push origin "$DATA_COMMIT:refs/heads/data"
+            fi
+          fi
+      - run: npm run prepare:data
+      - uses: actions/configure-pages@v5
+      - name: Build static site
+        env:
+          BASE_PATH: /stock-insight/
+        run: npm run build
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

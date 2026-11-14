@@ -1,0 +1,8 @@
+{
+  "companies": ["005930", "000660", "086520", "204620"],
+  "managers": ["브이아이피자산운용"],
+  "quarterYears": 5,
+  "monthsPerRun": 6,
+  "detailsPerRun": 120,
+  "requestsPerRun": 1800
+}

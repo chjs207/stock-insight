@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.data/
+.cache/
+.env
+.env.*
+!.env.example
+*appkey*.txt
+*secretkey*.txt
+*.sqlite*
+*.db
+.DS_Store
+outputs/
+public/data/
+.sites-runtime/
