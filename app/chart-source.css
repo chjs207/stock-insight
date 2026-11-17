@@ -1,0 +1,15 @@
+.chart-source-panel { margin-top: 12px; padding: 16px 18px; }
+.chart-source-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.chart-source-heading h2 { font-size: 16px; letter-spacing: -.035em; }
+.chart-source-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.chart-source-options button { min-height: 38px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--muted); font-size: 13px; font-weight: 700; }
+.chart-source-options button:hover { border-color: #a6ceba; background: #f3f9f5; }
+.chart-source-options button[aria-pressed="true"] { border-color: var(--deep); background: var(--deep); color: white; }
+.chart-source-options button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+.chart-source-panel > p { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.chart-source-panel > p[role="status"] { color: #77591c; }
+@media (max-width: 480px) {
+  .chart-source-panel { padding: 14px 12px; }
+  .chart-source-options { width: 100%; }
+  .chart-source-options button { flex: 1; min-height: 42px; }
+}

@@ -9,6 +9,9 @@ import type { Candle, PriceHistory, PricePeriod } from "../lib/price-data";
 import { averageStorageKey, defaultAverages, maxAverageLines, readAverageSettings } from "../lib/chart-preferences";
 import type { CloseAverage } from "../lib/chart-preferences";
 import AverageSettings from "./average-settings";
+import { chartSourceStorageKey, naverChartUrl, readChartSource } from "../lib/chart-source";
+import type { ChartSource } from "../lib/chart-source";
+import "./chart-source.css";
 
 const periods = { day: "일봉", week: "주봉", month: "월봉" } as const;
 const units = { day: "일", week: "주", month: "개월" };
@@ -151,6 +154,52 @@ function PriceCanvas({ candles, swingLevels, months, rangeRevision, averages, on
 }
 
 export default function CompanyPriceChart({ company }: { company: Company }) {
+  const [source, setSource] = useState<ChartSource>(readChartSource);
+  const [notice, setNotice] = useState("");
+
+  function selectSource(next: ChartSource) {
+    setSource(next);
+    try { localStorage.setItem(chartSourceStorageKey, next); setNotice(""); }
+    catch { setNotice("선택은 적용했지만 저장하지 못했습니다. 다음 방문에는 다시 선택해 주세요."); }
+  }
+
+  return <>
+    <section className="panel chart-source-panel" aria-labelledby="chart-source-title">
+      <div className="chart-source-heading"><h2 id="chart-source-title">차트 방식</h2>
+        <div className="chart-source-options" role="group" aria-label="차트 방식 선택">
+          <button type="button" aria-pressed={source === "kiwoom"} onClick={() => selectSource("kiwoom")}>키움 API</button>
+          <button type="button" aria-pressed={source === "naver"} onClick={() => selectSource("naver")}>네이버 증권</button>
+        </div>
+      </div>
+      <p>{source === "kiwoom" ? "캔들·거래량과 이동평균, 직전 고점·저점을 이 화면에서 확인합니다."
+        : "해당 기업의 네이버 증권 차트를 새 탭으로 엽니다. 키움 API 키 없이 사용할 수 있습니다."}</p>
+      {notice && <p role="status">{notice}</p>}
+    </section>
+    {source === "kiwoom" ? <KiwoomPriceChart key={company.corpCode} company={company}/> : <NaverPriceChart company={company}/>}
+  </>;
+}
+
+function NaverPriceChart({ company }: { company: Company }) {
+  const url = naverChartUrl(company.stockCode);
+  return <section className="panel price-panel" aria-labelledby="price-title">
+    <div className="panel-head">
+      <div className="panel-heading"><div><h2 id="price-title">주가 차트</h2><p>네이버 증권</p></div></div>
+      <span className="source-badge">NAVER</span>
+    </div>
+    <div className="naver-chart-content">
+      <div className="naver-chart-symbol" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4v16h16M7 15l4-5 4 2 5-7"/></svg>
+      </div>
+      <h3>{company.name} 차트</h3>
+      <p>네이버 증권에서 주가 흐름과 거래량을 확인하세요.</p>
+      {url ? <a className="naver-chart-open" href={url} target="_blank" rel="noopener noreferrer">네이버 차트 열기 <span aria-hidden="true">↗</span></a>
+        : <p className="notice error" role="alert">차트를 연결할 종목코드를 확인하지 못했습니다.</p>}
+      <p className="naver-chart-note">새 탭으로 열립니다. 스탁인사이트 탭에서 다시 조회를 이어갈 수 있습니다.</p>
+    </div>
+  </section>;
+}
+
+function KiwoomPriceChart({ company }: { company: Company }) {
   const [data, setData] = useState<PriceHistory | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
