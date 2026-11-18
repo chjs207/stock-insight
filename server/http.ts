@@ -3,8 +3,28 @@ import { BlockList } from "node:net";
 import { networkInterfaces } from "node:os";
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import type { IncomingMessage } from "node:http";
 
-type Api = (url: URL, method: string) => Promise<Response>;
+type Api = (url: URL, method: string, body?: unknown) => Promise<Response>;
+const messageBodyLimit = 128_000;
+function readMessageBody(request: IncomingMessage): Promise<{ body?: unknown; status?: number }> {
+  return new Promise(resolve => {
+    let size = 0; let oversized = false;
+    const parts: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > messageBodyLimit) { oversized = true; parts.length = 0; resolve({ status: 413 }); }
+      else if (!oversized) parts.push(chunk);
+    });
+    request.on("end", () => {
+      if (oversized) return;
+      try { resolve({ body: JSON.parse(Buffer.concat(parts).toString("utf8")) }); }
+      catch { resolve({ status: 400 }); }
+    });
+    request.on("error", () => resolve({ status: 400 }));
+    request.on("aborted", () => resolve({ status: 400 }));
+  });
+}
 const mime: Record<string, string> = { js: "text/javascript", css: "text/css", svg: "image/svg+xml", html: "text/html; charset=utf-8", woff2: "font/woff2", png: "image/png", ico: "image/x-icon" };
 export function localNetworkPolicy(port: number, lan: boolean) {
   const peers = new BlockList(); peers.addSubnet("127.0.0.0", 8);
@@ -35,14 +55,20 @@ export function httpApplication(api: Api, options: { port: number; lan: boolean;
       if (url.origin !== "http://" + host) { response.writeHead(403).end(); return; }
       const method = request.method ?? "GET";
       if (url.pathname.startsWith("/api/")) {
-        const allowed: Record<string, string[]> = { "/api/market": ["GET"], "/api/research": ["GET"], "/api/watchlist": ["GET", "PUT", "DELETE"], "/api/giants": ["GET", "PUT", "POST", "DELETE"] };
+        const allowed: Record<string, string[]> = { "/api/market": ["GET"], "/api/research": ["GET"], "/api/highs": ["POST"], "/api/watchlist": ["GET", "PUT", "DELETE"], "/api/giants": ["GET", "PUT", "POST", "DELETE"] };
         if (!allowed[url.pathname]) { response.writeHead(404).end(); return; }
         if (!allowed[url.pathname].includes(method)) { response.writeHead(405, { Allow: allowed[url.pathname].join(", ") }).end(); return; }
         const origin = request.headers.origin;
         if (request.headers["sec-fetch-site"] === "cross-site" || (origin && origin !== url.origin)) { response.writeHead(403).end(); return; }
-        if (Number(request.headers["content-length"] || 0) > 1024) { response.writeHead(413).end(); return; }
-        request.resume();
-        const result = await api(url, method);
+        const messageRequest = url.pathname === "/api/highs";
+        if (Number(request.headers["content-length"] || 0) > (messageRequest ? messageBodyLimit : 1024)) { request.resume(); response.writeHead(413).end(); return; }
+        let result: Response;
+        if (messageRequest) {
+          if (!/^application\/json(?:\s*;|$)/i.test(request.headers["content-type"] ?? "")) { request.resume(); response.writeHead(415).end(); return; }
+          const input = await readMessageBody(request);
+          if (input.status) { response.writeHead(input.status, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify({ error: input.status === 413 ? "메시지가 너무 큽니다. 나누어 붙여넣어 주세요." : "메시지 형식을 확인해 주세요." })); return; }
+          result = await api(url, method, input.body);
+        } else { request.resume(); result = await api(url, method); }
         response.writeHead(result.status, Object.fromEntries(result.headers));
         response.end(Buffer.from(await result.arrayBuffer()));
         return;

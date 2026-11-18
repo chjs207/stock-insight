@@ -7,6 +7,7 @@ import type { AnnualReport, Company, Financials, Metric, QuarterlyFinancials, Qu
 import { requestJson } from "../lib/client-api";
 import GiantsPage from "./giants";
 import CompanyResearch from "./company-research";
+import HighsPage from "./highs";
 import ValuationPanel from "./valuation";
 import CompanyPriceChart from "./price-chart";
 
@@ -685,6 +686,7 @@ export default function Dashboard({ corpCode, view, section }: { corpCode?: stri
   const giants = section === "giants";
   const research = section === "research";
   const watchlist = section === "watchlist";
+  const highs = section === "highs";
   return <>
     <header className="site-header">
       <div className="shell topbar">
@@ -694,14 +696,15 @@ export default function Dashboard({ corpCode, view, section }: { corpCode?: stri
         <div className="header-meta"><span className="market-badge">KOSPI</span><span className="market-badge">KOSDAQ</span></div>
       </div>
       <nav className="shell main-nav" aria-label="메인 메뉴">
-        <a href="/" aria-current={!giants && !research && !watchlist ? "page" : undefined}><Icon name="search" size={16}/> 재무검색</a>
+        <a href="/" aria-current={!giants && !research && !watchlist && !highs ? "page" : undefined}><Icon name="search" size={16}/> 재무검색</a>
         <a href="/?section=giants" aria-current={giants ? "page" : undefined}><Icon name="table" size={16}/> 거인의 어깨</a>
         <a href="/?section=research" aria-current={research ? "page" : undefined}><Icon name="research" size={16}/> 기업 리서치</a>
+        <a href="/?section=highs" aria-current={highs ? "page" : undefined}><Icon name="chart" size={16}/> 52주 신고가</a>
         <a href="/?section=watchlist" aria-current={watchlist ? "page" : undefined}><Icon name="star" size={16}/> 관심종목</a>
       </nav>
     </header>
     <main className="shell">
-      {research ? <CompanyResearch/> : giants ? <GiantsPage/> : watchlist ? <WatchlistPage/>
+      {highs ? <HighsPage/> : research ? <CompanyResearch/> : giants ? <GiantsPage/> : watchlist ? <WatchlistPage/>
         : corpCode ? <CompanyDetail key={corpCode} corpCode={corpCode} view={view}/> : <FinancialSearchPage/>}
     </main>
     <footer className="shell footer">

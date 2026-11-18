@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { get as httpGet } from "node:http";
+import { get as httpGet, request as httpRequest } from "node:http";
 import { openDatabase } from "../server/database";
 import { readConfiguration } from "../server/config";
 import { createApi } from "../server/api";
@@ -92,6 +92,31 @@ test("HTTP serves only built assets and rejects file disclosure and cross-site A
     expect((await fetch(base + "/api/research?page=0")).status).toBe(200);
     expect(api).toHaveBeenLastCalledWith(new URL(base + "/api/research?page=0"), "GET");
     expect((await fetch(base + "/api/research", { method: "POST" })).status).toBe(405);
+  } finally { server.closeIdleConnections(); await new Promise<void>(accept => server.close(() => accept())); }
+});
+
+test("message lookup accepts bounded JSON POST bodies and rejects malformed, cross-site and chunked oversized input", async () => {
+  const dist = await folder();
+  const api = vi.fn(async () => Response.json({ rows: [] }));
+  const { server } = httpApplication(api, { port: 0, lan: false, dist });
+  await new Promise<void>((accept, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", accept); });
+  const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
+  const headers = { "Content-Type": "application/json" };
+  try {
+    const body = { text: "보안) 지슨, 지니언스\n".repeat(100), refresh: false };
+    expect((await fetch(base + "/api/highs", { method: "POST", headers, body: JSON.stringify(body) })).status).toBe(200);
+    expect(api).toHaveBeenLastCalledWith(new URL(base + "/api/highs"), "POST", body);
+    expect((await fetch(base + "/api/highs")).status).toBe(405);
+    expect((await fetch(base + "/api/highs", { method: "POST", body: "text" })).status).toBe(415);
+    expect((await fetch(base + "/api/highs", { method: "POST", headers, body: "{" })).status).toBe(400);
+    expect((await fetch(base + "/api/highs", { method: "POST", headers: { ...headers, Origin: "https://untrusted.example" }, body: "{}" })).status).toBe(403);
+    const oversized = await new Promise<number | undefined>((accept, reject) => {
+      const request = httpRequest(base + "/api/highs", { method: "POST", headers }, response => { response.resume(); accept(response.statusCode); });
+      request.once("error", reject);
+      request.write('{"text":"'); request.write("x".repeat(128_001)); request.end('"}');
+    });
+    expect(oversized).toBe(413);
+    expect(api).toHaveBeenCalledTimes(1);
   } finally { server.closeIdleConnections(); await new Promise<void>(accept => server.close(() => accept())); }
 });
 

@@ -5,14 +5,20 @@ import { quoteService } from "../lib/quotes.ts";
 import { priceService } from "../lib/prices.ts";
 import { researchService } from "../lib/research.ts";
 import type { Company } from "../lib/market.ts";
+import { highService } from "../lib/highs.ts";
 
 export function createApi(db: D1Database, dartKey: string, transport: DartTransport) {
-  return async (url: URL, method: string): Promise<Response> => {
+  return async (url: URL, method: string, body?: unknown): Promise<Response> => {
     const params = url.searchParams;
     const market = marketService(db, dartKey, transport);
     const headers = { "Cache-Control": "no-store" };
     const json = (data: unknown) => Response.json(data, { headers });
     try {
+      if (url.pathname === "/api/highs" && method === "POST") {
+        if (!body || typeof body !== "object" || Array.isArray(body) || !("text" in body) || typeof body.text !== "string" ||
+            ("refresh" in body && typeof body.refresh !== "boolean")) throw new MarketError("조회할 메시지를 올바르게 입력해 주세요.", 400);
+        return json(await highService(db, dartKey, transport).analyze(body.text, "refresh" in body && body.refresh === true));
+      }
       if (url.pathname === "/api/research" && method === "GET") {
         const page = params.get("page") ?? "0";
         if (!/^(0|[1-9]\d{0,4})$/.test(page)) throw new MarketError("올바른 페이지를 선택해 주세요.", 400);

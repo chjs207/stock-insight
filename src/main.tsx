@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 import { createRoot } from "react-dom/client";
 import Dashboard from "../app/dashboard";
 import "../app/globals.css";
+import "../app/highs.css";
 import "./local.css";
 
 

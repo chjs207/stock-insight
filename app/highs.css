@@ -1,0 +1,47 @@
+.highs-hero { padding-bottom: 26px; }
+.highs-input-panel { margin-top: 13px; padding: 19px; }
+.highs-input-panel label { display: block; margin-bottom: 9px; font-size: 14px; font-weight: 750; }
+.highs-input-panel textarea { display: block; width: 100%; min-height: 150px; resize: vertical; padding: 13px; border: 1px solid #cbded3; border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.8; }
+.highs-input-panel textarea:focus { outline: 2px solid #80bda5; outline-offset: 2px; }
+.highs-input-meta, .highs-results-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 7px 14px; }
+.highs-input-meta { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.highs-input-meta p { flex: 1; min-width: 200px; }
+.highs-input-meta small { white-space: nowrap; }
+.highs-input-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+.highs-source-note, .highs-directory-date { margin-top: 13px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.highs-results, .highs-issues { margin-top: 15px; padding: 19px; }
+.highs-results-head { padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.highs-results h2, .highs-issues h2 { font-size: 17px; }
+.highs-results h2 strong, .highs-issues h2 strong { margin-left: 5px; color: var(--green); }
+.highs-results-head p, .highs-results-head small, .highs-issues > p { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.highs-company-list, .highs-issues ul { padding: 0; margin: 0; list-style: none; }
+.highs-company-list > li { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.4fr) auto auto; align-items: center; gap: 17px; padding: 19px 0; }
+.highs-company-list > li + li, .highs-issues li + li { border-top: 1px solid var(--line); }
+.highs-company-name, .highs-company-notes { min-width: 0; overflow-wrap: anywhere; }
+.highs-company-name strong { display: block; font-size: 15px; }
+.highs-company-name small, .highs-company-notes small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.highs-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.highs-tags span { padding: 4px 8px; border-radius: 5px; background: #edf6f0; color: var(--deep); font-size: 11px; line-height: 1.4; }
+.highs-company-notes p { margin-top: 6px; color: var(--muted); font-size: 12px; }
+.highs-company-links { display: flex; flex-wrap: wrap; gap: 7px; }
+.highs-company-links a { padding: 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--deep); font-size: 11px; white-space: nowrap; }
+.highs-company-links a:hover { background: #edf6f0; border-color: #a6cbb9; }
+.highs-watch { min-height: 33px; padding: 6px 9px; font-size: 11px; white-space: nowrap; }
+.highs-issues { border-color: #e5d7b6; }
+.highs-issues li { display: grid; grid-template-columns: auto 1fr; column-gap: 13px; row-gap: 4px; padding: 15px 0; }
+.highs-issues li strong { font-size: 13px; overflow-wrap: anywhere; }
+.highs-issues li > span { color: var(--muted); font-size: 11px; }
+.highs-issues li p, .highs-choice-list { grid-column: 1 / -1; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.highs-choice-list { display: grid; gap: 3px; margin-top: 4px; color: var(--deep); }
+@media(max-width: 760px) {
+  .highs-company-list > li { grid-template-columns: 1fr auto; gap: 12px; }
+  .highs-company-notes { grid-column: 1 / -1; grid-row: 2; }
+  .highs-company-links { grid-column: 1; }
+  .highs-watch { grid-column: 2; }
+}
+@media(max-width: 480px) {
+  .highs-input-panel, .highs-results, .highs-issues { padding: 15px; }
+  .highs-input-panel textarea { font-size: 16px; }
+  .main-nav a { font-size: 10px; }
+  .highs-input-actions > button { min-height: 40px; }
+}

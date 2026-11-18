@@ -324,7 +324,7 @@ tbody tr { border-top: 1px solid var(--line); }
   .research-opinion div { gap: 8px; }
 }
 @media (max-width: 480px) {
-  .main-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; overflow: visible; }
+  .main-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; overflow: visible; }
   .main-nav a { flex-direction: column; justify-content: center; gap: 4px; padding-inline: 2px; font-size: 11px; }
   .watchlist-item { flex-wrap: wrap; }
   .watchlist-item .company-row { flex-basis: 100%; }
