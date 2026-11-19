@@ -1,0 +1,44 @@
+.financial-chart-panel .panel-head { padding-bottom: 6px; }
+.financial-mode button { min-width: 64px; min-height: 38px; font-size: 12px; }
+.financial-chart-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px; }
+.financial-chart-filters:empty { display: none; }
+.financial-chart-filters label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.financial-chart-filters select { min-height: 38px; border: 1px solid var(--line); border-radius: 7px; background: white; padding: 5px 8px; font: inherit; color: var(--ink); }
+.financial-chart-filters button { min-height: 36px; }
+.financial-trend { padding-top: 15px; }
+.financial-trend-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 0 16px 12px; }
+.financial-trend-heading h4 { font-size: 14px; }
+.financial-trend-heading > span { color: var(--muted); font-size: 11px; }
+.financial-plot-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+.financial-plot-grid { display: grid; grid-template-columns: 60px minmax(0, 1fr); margin: 0 12px 0 3px; }
+.financial-y-axis { position: sticky; left: 0; z-index: 1; height: 220px; background: white; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.financial-y-axis span { position: absolute; right: 7px; transform: translateY(-50%); white-space: nowrap; }
+.financial-plot { position: relative; height: 220px; }
+.financial-plot > svg { display: block; width: 100%; height: 100%; }
+.financial-targets { position: absolute; inset: 0; display: flex; }
+.financial-targets button { flex: 1; min-width: 0; border: 0; border-radius: 4px; background: transparent; }
+.financial-targets button:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.financial-x-axis, .financial-year-axis { display: flex; padding-top: 6px; text-align: center; color: var(--muted); font-size: 11px; }
+.financial-x-axis span { flex: 1; }
+.financial-year-axis { border-top: 1px solid var(--line); margin-top: 6px; color: var(--ink); }
+.financial-selection { margin: 14px 14px 4px; padding: 11px; border: 1px solid #dfebe3; border-radius: 9px; background: #f6faf7; font-size: 11px; font-variant-numeric: tabular-nums; }
+.financial-selection-heading { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 8px; }
+.financial-selection-heading > span { color: var(--muted); }
+.financial-value-heading, .financial-value-row { display: grid; grid-template-columns: minmax(95px, 1.2fr) minmax(55px, 1fr) minmax(65px, 1fr); gap: 5px; align-items: baseline; padding: 5px 0; }
+.financial-value-heading { color: var(--muted); border-bottom: 1px solid #e2ebe5; font-size: 10px; }
+.financial-value-heading > :not(:first-child), .financial-value-row > :not(:first-child) { text-align: right; overflow-wrap: anywhere; }
+.financial-value-row > span:first-child { display: flex; align-items: center; gap: 5px; }
+.financial-value-row .dot { flex: none; width: 6px; height: 6px; }
+.financial-qoq-detail { margin-top: 6px; color: var(--muted); line-height: 1.8; }
+.financial-profit-options { display: flex; flex-wrap: wrap; gap: 4px; border-top: 1px solid var(--line); margin: 16px 14px 0; padding-top: 13px; }
+.financial-profit-options button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 38px; padding: 6px 9px; border: 1px solid transparent; border-radius: 7px; color: var(--muted); background: transparent; font: inherit; font-size: 11px; }
+.financial-profit-options button[aria-pressed="true"] { border-color: #bad7c7; color: var(--deep); background: #eff7f2; font-weight: 700; }
+.financial-profit-options button:focus-visible, .financial-mode button:focus-visible, .financial-chart-filters select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+@media (max-width: 480px) {
+  .financial-chart-panel .panel-head { padding-inline: 12px; }
+  .financial-chart-filters { padding-inline: 12px; }
+  .financial-trend-heading { margin-inline: 12px; }
+  .financial-selection { margin-inline: 10px; padding: 9px; }
+  .financial-profit-options { margin-inline: 10px; }
+  .financial-profit-options button { flex: 1 0 auto; min-height: 42px; }
+}

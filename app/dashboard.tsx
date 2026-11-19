@@ -1,15 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { changePercent, growth, metrics } from "../lib/market";
-import type { AnnualReport, Company, Financials, Metric, QuarterlyFinancials, QuarterlyYear, QuarterReport } from "../lib/market";
+import type { AnnualReport, Company, Financials, QuarterlyFinancials, QuarterlyYear, QuarterReport } from "../lib/market";
 import { requestJson } from "../lib/client-api";
 import GiantsPage from "./giants";
 import CompanyResearch from "./company-research";
 import HighsPage from "./highs";
 import ValuationPanel from "./valuation";
 import CompanyPriceChart from "./price-chart";
+import { AnnualFinancialChart, QuarterlyFinancialChart } from "./financial-chart";
+import { quarterIndex } from "../lib/financial-chart";
 
 const figures = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
 const exactFigures = new Intl.NumberFormat("ko-KR");
@@ -78,140 +80,7 @@ function request<T>(params: Record<string, string>, signal?: AbortSignal) {
   return requestJson<T>("/api/market?" + new URLSearchParams(params), { signal });
 }
 
-type GrowthPeriod = {
-  label: string;
-  axisLabel: string;
-  group?: number;
-  report: AnnualReport;
-  previous?: AnnualReport;
-};
-
-function GrowthChart({ periods, title, subtitle, note, controls }: {
-  periods: GrowthPeriod[];
-  title: string;
-  subtitle: string;
-  note: string;
-  controls?: ReactNode;
-}) {
-  const titleId = useId();
-  const [selection, setSelection] = useState<Metric | "all">("all");
-  const [focusedPeriod, setFocusedPeriod] = useState<string | null>(null);
-  const hover = periods.findIndex(({ label }) => label === focusedPeriod);
-  const groups = Array.from(new Set(periods.flatMap(({ group }) => group === undefined ? [] : [group])));
-  const series = metrics.filter(({ key }) => selection === "all" || selection === key).map((metric) => ({
-    ...metric,
-    values: periods.map(({ report, previous }) => changePercent(report, previous, metric.key)),
-  }));
-  const values = series.flatMap(({ values }) => values).filter((value): value is number => value !== null);
-  const min = Math.min(0, ...values);
-  const max = Math.max(0, ...values);
-  const rawStep = (max - min) / 4 || 5;
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const step = ([1, 2, 2.5, 5, 10].find((value) => value * magnitude >= rawStep) ?? 10) * magnitude;
-  const bottom = Math.floor(min / step) * step;
-  const top = Math.ceil(max / step) * step || step;
-  const y = (value: number) => 10 + (top - value) / (top - bottom) * 166;
-  const ticks = Array.from({ length: Math.round((top - bottom) / step) + 1 }, (_, index) => top - step * index);
-  const x = (index: number) => (index + .5) / periods.length * 960;
-
-  return <section className="panel chart-panel" aria-labelledby={titleId}>
-    <div className="panel-head">
-      <div className="panel-heading"><span className="panel-icon"><Icon name="chart"/></span>
-        <div><h3 id={titleId}>{title}</h3><p>{subtitle}</p></div>
-      </div>
-      <div className="chart-controls">
-        {controls}
-        <div className="legend" role="group" aria-label="차트 항목">
-          {metrics.map(({ key, label, color }) =>
-            <button type="button" key={key} className={selection === "all" || selection === key ? "" : "muted"}
-              aria-pressed={selection === key} onClick={() => { setSelection(selection === key ? "all" : key); setFocusedPeriod(null); }}>
-              <span className="dot" style={{ background: color }}/>{label}
-            </button>)}
-        </div>
-      </div>
-    </div>
-    {values.length === 0 ? <p className="empty-chart">선택한 항목에서 비교할 수 있는 자료가 없습니다.</p> :
-      <div className="chart-scroll">
-        <div className="chart-area" style={groups.length ? { minWidth: 40 + periods.length * 27 } : undefined}>
-          <div className="y-axis" aria-hidden="true">
-            {ticks.map((tick) => <span key={tick} style={{ top: (y(tick) / 1.86) + "%" }}>{figures.format(tick)}%</span>)}
-          </div>
-          <div className="plot">
-            <div className="plot-lines">
-              <svg viewBox="0 0 960 186" preserveAspectRatio="none" role="img" aria-label={series.map(({ label }) => label).join(", ") + " " + title}>
-                {ticks.map((tick) => <line key={tick} x1="0" x2="960" y1={y(tick)} y2={y(tick)} stroke={tick === 0 ? "#aabbb4" : "#e8eeeb"} strokeDasharray={tick === 0 ? "5 4" : undefined} vectorEffect="non-scaling-stroke"/>)}
-                {groups.slice(1).map((group, index) => {
-                  const divider = (index + 1) / groups.length * 960;
-                  return <line key={group} x1={divider} x2={divider} y1="8" y2="178" stroke="#e8eeeb" vectorEffect="non-scaling-stroke"/>;
-                })}
-                {hover >= 0 && <line x1={x(hover)} x2={x(hover)} y1="8" y2="178" stroke="#b9cac3" strokeDasharray="4 4" vectorEffect="non-scaling-stroke"/>}
-                {series.map(({ key, color, values }) => {
-                  const path = values.map((value, index) => value === null ? "" :
-                    (index === 0 || values[index - 1] === null ? "M" : "L") + x(index) + "," + y(value)).join(" ");
-                  return <path key={key} d={path} fill="none" stroke={color} strokeWidth="2.35" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
-                })}
-              </svg>
-              {series.flatMap(({ key, color, values }) => values.map((value, index) => value === null ? null :
-                <span key={key + index} className="chart-point" style={{
-                  left: x(index) / 9.6 + "%", top: y(value) / 1.86 + "%", color,
-                }}/>))}
-              <div className="chart-targets">
-                {periods.map(({ label }, index) => <button type="button" key={label}
-                  aria-label={label + " " + series.map((item) => item.label + " " + (item.values[index] === null ? "비교 불가" : percentage(item.values[index]))).join(", ")}
-                  onPointerEnter={() => setFocusedPeriod(label)} onPointerLeave={() => setFocusedPeriod(null)}
-                  onFocus={() => setFocusedPeriod(label)} onBlur={() => setFocusedPeriod(null)}
-                  onClick={() => setFocusedPeriod(label)} onKeyDown={(event) => { if (event.key === "Escape") setFocusedPeriod(null); }}/>)}
-              </div>
-              {hover >= 0 && <div className="chart-tooltip"
-                style={{ left: Math.min(77, Math.max(23, x(hover) / 9.6)) + "%" }} aria-hidden="true">
-                <strong>{periods[hover].label}</strong>
-                {series.map(({ key, label, color, values }) => <div key={key}>
-                  <span><i className="dot" style={{ background: color }}/>{label}</span>
-                  <b>{values[hover] === null ? "—" : percentage(values[hover])}</b>
-                </div>)}
-              </div>}
-            </div>
-            <div className="x-axis">{periods.map(({ label, axisLabel }) => <span key={label}>{axisLabel}</span>)}</div>
-            {groups.length > 0 && <div className="x-axis year-axis">{groups.map((year) => <span key={year}>{year}</span>)}</div>}
-          </div>
-        </div>
-      </div>}
-    <p className="chart-note"><Icon name="info" size={14}/> {note}</p>
-  </section>;
-}
-
-function AnnualGrowthChart({ reports }: { reports: AnnualReport[] }) {
-  const periods = reports.slice(1).map((report, index) => ({
-    label: report.year + "년", axisLabel: String(report.year), report,
-    previous: report.year === reports[index].year + 1 ? reports[index] : undefined,
-  }));
-  return <GrowthChart periods={periods} title="전년 대비 증감률" subtitle="연도별 변화율 · %"
-    note="(당해 금액 − 전년 금액) ÷ |전년 금액| × 100. 전년 금액이 0이거나 비교 기준이 다른 경우는 생략합니다."/>;
-}
-
 const quarterComparisons = { yoy: "전년 동분기 대비", qoq: "직전 분기 대비" } as const;
-const quarterIndex = ({ year, quarter }: QuarterReport) => year * 4 + quarter - 1;
-
-function QuarterlyGrowthChart({ years, byQuarter }: { years: QuarterlyYear[]; byQuarter: Map<number, QuarterReport> }) {
-  const [comparison, setComparison] = useState<keyof typeof quarterComparisons>("yoy");
-  const offset = comparison === "yoy" ? 4 : 1;
-  const reports = years.slice().reverse().flatMap((year) => year.reports);
-  const periods = reports.map((report) => ({
-    label: report.year + "년 " + report.quarter + "분기",
-    axisLabel: report.quarter + "Q",
-    group: report.year,
-    report,
-    previous: byQuarter.get(quarterIndex(report) - offset),
-  }));
-  const controls = <div className="chart-comparison" role="group" aria-label="분기 증감률 비교 기준">
-    {(Object.keys(quarterComparisons) as (keyof typeof quarterComparisons)[]).map((key) =>
-      <button key={key} type="button" aria-pressed={comparison === key} onClick={() => setComparison(key)}>
-        {quarterComparisons[key]}
-      </button>)}
-  </div>;
-  return <GrowthChart periods={periods} title="분기 증감률" subtitle={quarterComparisons[comparison] + " · %"}
-    controls={controls} note="(해당 분기 금액 − 비교 분기 금액) ÷ |비교 분기 금액| × 100. 자료가 없거나, 비교 금액이 0이거나, 통화·연결 기준이 다르면 비워둡니다."/>;
-}
 
 type ReportColumn = {
   label: string;
@@ -348,7 +217,7 @@ function QuarterlyTable({ company, data, setData }: {
   const byQuarter = new Map([...olderReports, ...(data?.years.flatMap(({ reports }) => reports) ?? [])]
     .map((report) => [quarterIndex(report), report]));
   return <>
-    {data && <QuarterlyGrowthChart years={data.years} byQuarter={byQuarter}/>}
+    {data && <QuarterlyFinancialChart years={data.years} byQuarter={byQuarter}/>}
     <section className="panel table-panel quarterly-panel" aria-labelledby="quarterly-title">
       <div className="panel-head">
         <div className="panel-heading"><span className="panel-icon"><Icon name="table"/></span>
@@ -628,7 +497,7 @@ function CompanyFinancials({ company }: { company: Company }) {
         })}
       </div>
       <ValuationPanel company={company} annual={latest} quarters={quarters}/>
-      <AnnualGrowthChart reports={reports}/>
+      <AnnualFinancialChart reports={reports}/>
       <FinancialTable reports={reports}/>
     </>}
     {(data || error) && <QuarterlyTable company={company} data={quarters} setData={setQuarters}/>}
